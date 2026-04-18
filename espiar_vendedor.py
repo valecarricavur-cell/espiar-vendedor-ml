@@ -7,6 +7,13 @@ Monitorea las publicaciones activas de un vendedor de MercadoLibre Argentina.
 - Compara con el snapshot anterior para detectar cambios y estimar ventas.
 - Envía un resumen por WhatsApp usando Twilio.
 
+Uso:
+    python espiar_vendedor.py <NICKNAME> [--carpeta NOMBRE_CARPETA]
+
+    --carpeta   Subcarpeta dentro de reportes_ml/ donde guardar el Excel.
+                Útil para separar reportes por competidor.
+                Ejemplo: python espiar_vendedor.py todoairelibregd --carpeta TODOAIRELIBRE
+
 Dependencias:
     pip install requests openpyxl twilio python-dotenv
 
@@ -19,8 +26,8 @@ Variables de entorno necesarias (archivo .env):
 
 import os
 import sys
-import json
 import glob
+import argparse
 import requests
 from datetime import datetime
 from pathlib import Path
@@ -28,21 +35,28 @@ from pathlib import Path
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
-from dotenv import load_dotenv
-from twilio.rest import Client
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+try:
+    from twilio.rest import Client as TwilioClient
+    TWILIO_DISPONIBLE = True
+except ImportError:
+    TWILIO_DISPONIBLE = False
 
 # ─── Configuración ────────────────────────────────────────────────────────────
-
-load_dotenv()
 
 TWILIO_SID   = os.getenv("TWILIO_ACCOUNT_SID")
 TWILIO_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 WA_FROM      = os.getenv("TWILIO_WHATSAPP_FROM", "whatsapp:+14155238886")
 WA_TO        = os.getenv("TWILIO_WHATSAPP_TO")
 
-# Directorio donde se guardan los reportes Excel
-REPORTS_DIR = Path("reportes_ml")
-REPORTS_DIR.mkdir(exist_ok=True)
+# Directorio raíz donde se guardan todos los reportes
+REPORTS_ROOT = Path("reportes_ml")
 
 # Cantidad máxima de publicaciones a recuperar por vendedor
 MAX_ITEMS = 1000
@@ -148,18 +162,18 @@ def obtener_detalle_items(ids: list[str]) -> list[dict]:
 
 # ─── Funciones de Excel ────────────────────────────────────────────────────────
 
-def nombre_archivo(nickname: str, fecha: datetime) -> Path:
-    """Genera el nombre del archivo Excel con fecha y hora."""
+def nombre_archivo(nickname: str, fecha: datetime, carpeta: Path) -> Path:
+    """Genera el nombre del archivo Excel con fecha y hora dentro de la carpeta indicada."""
     ts = fecha.strftime("%Y%m%d_%H%M%S")
-    return REPORTS_DIR / f"{nickname}_{ts}.xlsx"
+    return carpeta / f"{nickname}_{ts}.xlsx"
 
 
-def guardar_excel(items: list[dict], nickname: str, fecha: datetime) -> Path:
+def guardar_excel(items: list[dict], nickname: str, fecha: datetime, carpeta: Path) -> Path:
     """
-    Crea un archivo Excel con los datos del vendedor.
+    Crea un archivo Excel con los datos del vendedor dentro de la carpeta indicada.
     Retorna la ruta del archivo creado.
     """
-    ruta = nombre_archivo(nickname, fecha)
+    ruta = nombre_archivo(nickname, fecha, carpeta)
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Publicaciones"
@@ -199,13 +213,13 @@ def guardar_excel(items: list[dict], nickname: str, fecha: datetime) -> Path:
     return ruta
 
 
-def cargar_reporte_anterior(nickname: str) -> dict[str, dict] | None:
+def cargar_reporte_anterior(nickname: str, carpeta: Path) -> dict[str, dict] | None:
     """
-    Busca el reporte Excel más reciente del vendedor (excluyendo el actual)
+    Busca el reporte Excel más reciente del vendedor dentro de la carpeta indicada
     y retorna un dict {item_id: {precio, stock, vendidos}}.
     Retorna None si no existe reporte previo.
     """
-    patron = str(REPORTS_DIR / f"{nickname}_*.xlsx")
+    patron = str(carpeta / f"{nickname}_*.xlsx")
     archivos = sorted(glob.glob(patron))
 
     if len(archivos) < 2:
@@ -368,6 +382,9 @@ def armar_mensaje(
 
 def enviar_whatsapp(mensaje: str) -> None:
     """Envía el mensaje de texto por WhatsApp a través de la API de Twilio."""
+    if not TWILIO_DISPONIBLE:
+        print("[!] Twilio no instalado. Saltando envío de WhatsApp.")
+        return
     if not all([TWILIO_SID, TWILIO_TOKEN, WA_TO]):
         print(
             "[!] Credenciales de Twilio incompletas. "
@@ -375,7 +392,7 @@ def enviar_whatsapp(mensaje: str) -> None:
         )
         return
 
-    client = Client(TWILIO_SID, TWILIO_TOKEN)
+    client = TwilioClient(TWILIO_SID, TWILIO_TOKEN)
     msg = client.messages.create(
         from_=WA_FROM,
         to=WA_TO,
@@ -387,14 +404,27 @@ def enviar_whatsapp(mensaje: str) -> None:
 # ─── Punto de entrada ──────────────────────────────────────────────────────────
 
 def main():
-    if len(sys.argv) < 2:
-        print("Uso: python espiar_vendedor.py <NICKNAME_VENDEDOR>")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(
+        description="Espía las publicaciones activas de un vendedor de MercadoLibre Argentina."
+    )
+    parser.add_argument("nickname", help="Nickname del vendedor en MercadoLibre")
+    parser.add_argument(
+        "--carpeta",
+        default=None,
+        help="Subcarpeta dentro de reportes_ml/ para guardar el Excel (ej: TODOAIRELIBRE)",
+    )
+    args = parser.parse_args()
 
-    nickname_input = sys.argv[1].strip()
+    nickname_input = args.nickname.strip()
     fecha_ahora    = datetime.now()
 
-    print(f"\n=== Espiando vendedor: {nickname_input} ===\n")
+    # Determinar carpeta de destino: reportes_ml/CARPETA o reportes_ml/NICKNAME
+    subcarpeta = args.carpeta if args.carpeta else nickname_input.upper()
+    reports_dir = REPORTS_ROOT / subcarpeta
+    reports_dir.mkdir(parents=True, exist_ok=True)
+
+    print(f"\n=== Espiando vendedor: {nickname_input} ===")
+    print(f"    Carpeta de reportes: {reports_dir}\n")
 
     # 1. Resolver seller_id
     print("[1/5] Buscando seller_id…")
@@ -415,12 +445,12 @@ def main():
     items = obtener_detalle_items(ids)
     print(f"      {len(items)} ítems procesados.")
 
-    # 4. Guardar snapshot en Excel (antes de cargar el anterior para que quede en disco)
+    # 4. Guardar snapshot en Excel dentro de la carpeta del competidor
     print("[4/5] Guardando reporte en Excel…")
-    ruta_excel = guardar_excel(items, nickname_oficial, fecha_ahora)
+    ruta_excel = guardar_excel(items, nickname_oficial, fecha_ahora, reports_dir)
 
-    # 5. Comparar con reporte anterior
-    anteriores = cargar_reporte_anterior(nickname_oficial)
+    # 5. Comparar con reporte anterior dentro de la misma carpeta
+    anteriores = cargar_reporte_anterior(nickname_oficial, reports_dir)
     cambios    = comparar_snapshots(items, anteriores)
 
     print(f"\n── Resumen de cambios ──")
@@ -430,7 +460,7 @@ def main():
     print(f"   Nuevas publicaciones: {len(cambios['nuevos'])}")
     print(f"   Eliminadas:           {len(cambios['eliminados'])}")
 
-    # 6. Enviar resumen por WhatsApp
+    # 6. Enviar resumen por WhatsApp (solo si Twilio está configurado)
     print("\n[5/5] Enviando resumen por WhatsApp…")
     mensaje = armar_mensaje(nickname_oficial, items, cambios, fecha_ahora)
     enviar_whatsapp(mensaje)
