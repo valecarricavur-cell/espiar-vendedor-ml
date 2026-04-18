@@ -1,0 +1,16 @@
+# Credenciales — NUNCA subir al repo
+.env
+
+# Reportes generados (son locales)
+reportes_ml/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# macOS
+.DS_Store
