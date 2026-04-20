@@ -1,0 +1,28 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# WATCHLIST — Publicaciones a monitorear
+# ─────────────────────────────────────────────────────────────────────────────
+# Pegá una URL de MercadoLibre por línea.
+# Aceptamos cualquier formato:
+#   https://articulo.mercadolibre.com.ar/MLA-1234567-titulo-del-producto-_JM
+#   https://www.mercadolibre.com.ar/titulo/p/MLA12345678
+#   MLA1234567   ← solo el ID también funciona
+#
+# Las líneas que empiezan con # son comentarios (se ignoran).
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Ejemplo (borrá estas líneas y pegá tus links):
+https://articulo.mercadolibre.com.ar/MLA-881673283-buzo-hombre-montagne-skyler-increible-_JM
+https://articulo.mercadolibre.com.ar/MLA-1124908626-campera-hombre-montagne-viggo-soft-shell-impermeable-capucha-_JM?attributes=COLOR_SECONDARY_COLOR%3AQXp1bA%3D%3D&picker=true&searchVariation=178369506931&pdp_filters=seller_id%3A32898018&quantity=1
+https://articulo.mercadolibre.com.ar/MLA-1927446310-zapatillas-hombre-montagne-deportiva-montana-_JM?searchVariation=185263508081&pdp_filters=seller_id%3A32898018#polycard_client=search-desktop&searchVariation=185263508081&search_layout=grid&position=7&type=item&tracking_id=5a0adf1f-8557-47bb-a3dc-12516bc0a51c
+https://articulo.mercadolibre.com.ar/MLA-1143960838-zapatillas-hombre-montagne-zori-running-deportivas-_JM?searchVariation=187489412607&pdp_filters=seller_id%3A32898018#polycard_client=search-desktop&searchVariation=187489412607&search_layout=grid&position=13&type=item&tracking_id=b1b432f6-2590-4d1f-9bb8-60bb3eabfff7
+https://articulo.mercadolibre.com.ar/MLA-1133790878-botas-mujer-montagne-seilas-gtx-trekking-impermeable-_JM?searchVariation=188950620357&pdp_filters=shipping%3Afulfillment%7Cseller_id%3A32898018#polycard_client=search-desktop&searchVariation=188950620357&search_layout=grid&position=3&type=item&tracking_id=89d9af9c-9c99-4dd6-8ffd-daf130f1e7d7
+https://articulo.mercadolibre.com.ar/MLA-1425058047-botas-mujer-montagne-fitz-trekking-_JM?searchVariation=183693589591#polycard_client=recommendations_vip-seller_items-above&reco_backend=ranker-retsys-same-seller&reco_model=rk_entity_sameseller&reco_client=vip-seller_items-above&reco_item_pos=1&reco_backend_type=low_level&reco_id=1916d682-06e9-4158-97f8-16bd512e06ea
+https://articulo.mercadolibre.com.ar/MLA-1372717333-zapatillas-hombre-montagne-new-blaze-deportivas-_JM?searchVariation=193499549317&pdp_filters=shipping%3Afulfillment%7Cseller_id%3A32898018#polycard_client=search-desktop&searchVariation=193499549317&search_layout=grid&position=20&type=item&tracking_id=89d9af9c-9c99-4dd6-8ffd-daf130f1e7d7
+https://articulo.mercadolibre.com.ar/MLA-1143972933-zapatillas-mujer-montagne-regen-impermeable-running-_JM?searchVariation=187491371625#polycard_client=search-desktop&searchVariation=187491371625&search_layout=grid&position=6&type=item&tracking_id=904c2ed6-6fda-44f0-b996-dfc2e7b1175a
+https://articulo.mercadolibre.com.ar/MLA-1288444203-botas-hombre-montagne-trekking-impermeables-in-_JM?attributes=COLOR_SECONDARY_COLOR%3AUHJvaGlrZSBWZXJkZSBNaWxpdGFy&quantity=1&picker=true&searchVariation=183695851525
+https://articulo.mercadolibre.com.ar/MLA-1365925577-botas-mujer-montagne-impermeables-trekking-_JM?searchVariation=180666928975#polycard_client=search-desktop&searchVariation=180666928975&search_layout=grid&position=6&type=item&tracking_id=038df8fd-d0b6-43dc-b187-683c976f6666
+https://articulo.mercadolibre.com.ar/MLA-1288470024-botas-montagne-glide-hombre-adulto-impermeables-_JM?searchVariation=178939801031#polycard_client=search-desktop&searchVariation=178939801031&search_layout=grid&position=12&type=item&tracking_id=e7cd5e6e-ba59-41d3-8f5e-305b258bdcb0
+https://articulo.mercadolibre.com.ar/MLA-1433492501-botas-montagne-mujer-trekking-impermeables-_JM?searchVariation=183211677555#polycard_client=search-desktop&searchVariation=183211677555&search_layout=grid&position=18&type=item&tracking_id=9723156d-b186-4ecf-af71-da06bbbdfac3
+https://articulo.mercadolibre.com.ar/MLA-881694738-matera-montagne-_JM?searchVariation=65268006736&pdp_filters=seller_id%3A32898018#polycard_client=search-desktop&searchVariation=65268006736&search_layout=grid&position=5&type=item&tracking_id=d63d69a8-431c-4d21-85a2-0a981b354419
+https://articulo.mercadolibre.com.ar/MLA-1930355272-zapatillas-unisex-nino-montagne-trekking-outdoor-_JM?searchVariation=185338630347&pdp_filters=seller_id%3A32898018#polycard_client=search-desktop&searchVariation=185338630347&search_layout=grid&position=2&type=item&tracking_id=d6a45af5-8270-448f-b2c3-86a3e341c292
+https://articulo.mercadolibre.com.ar/MLA-1130927584-buzo-hombre-montagne-winton-polar-fleece-_JM?searchVariation=198852954349&pdp_filters=seller_id%3A32898018#polycard_client=search-desktop&searchVariation=198852954349&search_layout=grid&position=16&type=item&tracking_id=156d6208-791b-44c8-9cb3-db1e006f90a6

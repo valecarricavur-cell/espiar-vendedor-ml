@@ -1,0 +1,2 @@
+# Publicaciones específicas a monitorear para este cliente
+# Una URL de MercadoLibre por línea

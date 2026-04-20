@@ -1,0 +1,22 @@
+{
+  "cliente": "Nombre del Cliente",
+  "activo": true,
+  "whatsapp": "+5491155555555",
+  "email": "cliente@email.com",
+  "plataformas": {
+    "mercadolibre": {
+      "activo": true,
+      "vendedores_a_espiar": ["nickname_competidor1", "nickname_competidor2"]
+    },
+    "instagram": {
+      "activo": false,
+      "cuentas_a_monitorear": ["@competidor1"]
+    }
+  },
+  "agentes": {
+    "espionaje": true,
+    "contenido": false,
+    "fotos": false
+  },
+  "notificar_por": ["whatsapp"]
+}

@@ -1,0 +1,22 @@
+{
+  "cliente": "TodoAireLibre",
+  "activo": true,
+  "whatsapp": "",
+  "email": "",
+  "plataformas": {
+    "mercadolibre": {
+      "activo": true,
+      "vendedores_a_espiar": ["todoairelibregd"]
+    },
+    "instagram": {
+      "activo": false,
+      "cuentas_a_monitorear": []
+    }
+  },
+  "agentes": {
+    "espionaje": true,
+    "contenido": false,
+    "fotos": false
+  },
+  "notificar_por": ["whatsapp"]
+}
