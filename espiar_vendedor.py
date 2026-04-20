@@ -2,6 +2,8 @@
 espiar_vendedor.py
 ------------------
 Monitorea las publicaciones activas de un vendedor de MercadoLibre Argentina.
+Usa Playwright para recorrer las páginas de la tienda y requests para obtener
+el detalle de cada publicación (vendidos, stock, marca, tipo de producto).
 
 Genera dos salidas:
   - Excel (.xlsx): hoja principal + resumen por marca + detalle de variantes
@@ -14,7 +16,8 @@ Uso:
         python espiar_vendedor.py todoairelibregd --carpeta TODOAIRELIBRE
 
 Dependencias:
-    pip install requests openpyxl python-dotenv
+    pip install playwright requests openpyxl python-dotenv
+    playwright install chromium
 
 Variables de entorno opcionales (archivo .env) para WhatsApp:
     TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM, TWILIO_WHATSAPP_TO
@@ -22,17 +25,20 @@ Variables de entorno opcionales (archivo .env) para WhatsApp:
 
 import os
 import sys
+import re
 import glob
+import time
 import argparse
 import textwrap
 import requests
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 import openpyxl
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
 
 try:
@@ -54,182 +60,246 @@ TWILIO_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 WA_FROM      = os.getenv("TWILIO_WHATSAPP_FROM", "whatsapp:+14155238886")
 WA_TO        = os.getenv("TWILIO_WHATSAPP_TO")
 
-ML_APP_ID  = os.getenv("ML_APP_ID")
-ML_APP_SECRET = os.getenv("ML_APP_SECRET")
+REPORTS_ROOT   = Path("reportes_ml")
+WORKERS        = 15   # requests paralelos para páginas de producto
+DELAY_LISTING  = 1.5  # segundos entre páginas del listado (Playwright)
 
-REPORTS_ROOT = Path("reportes_ml")
-MAX_ITEMS    = 1000
-API_BASE     = "https://api.mercadolibre.com"
+_HEADERS_WEB = {
+    "User-Agent":      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+    "Accept-Language": "es-AR,es;q=0.9,en;q=0.8",
+    "Accept":          "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+}
 
-# Token de acceso a la API de ML (se renueva automáticamente)
-_ml_token: dict = {"access_token": None, "expires_at": 0}
+
+# ─── Scraping: páginas del listado (Playwright) ───────────────────────────────
+
+def _wid_desde_url(url: str) -> Optional[str]:
+    """Extrae el wid (item ID individual del vendedor) de la URL del poly-card."""
+    m = re.search(r'[?&]wid=(MLA\d+)', url)
+    return m.group(1) if m else None
 
 
-# ─── MercadoLibre Auth ────────────────────────────────────────────────────────
+def _precio_desde_texto(texto: str) -> float:
+    """Convierte '52.673' o '52673' a 52673.0"""
+    limpio = re.sub(r'[^\d,]', '', texto).replace(',', '.')
+    try:
+        return float(limpio.replace('.', '').replace(',', '.')) if limpio else 0.0
+    except ValueError:
+        return 0.0
 
-import time as _time
 
-def obtener_ml_token() -> str:
+def scrape_paginas_vendedor(nickname: str) -> list[dict]:
     """
-    Obtiene un access token de nivel app usando client credentials.
-    Lo cachea en memoria y lo renueva cuando expira.
-    Requiere ML_APP_ID y ML_APP_SECRET en el .env.
+    Usa Playwright (headless) para recorrer TODAS las páginas de la tienda.
+    Intenta primero con headless=True; si no encuentra productos, abre el
+    navegador visible (headless=False) y reintenta.
+
+    Retorna lista de dicts con: titulo, precio, item_id, url_catalogo,
+    url_articulo, envio_gratis, marca_card (del card, no del spec).
     """
-    global _ml_token
-    if _ml_token["access_token"] and _time.time() < _ml_token["expires_at"]:
-        return _ml_token["access_token"]
+    from playwright.sync_api import sync_playwright
 
-    if not ML_APP_ID or not ML_APP_SECRET:
-        raise RuntimeError(
-            "\n⚠️  La API de MercadoLibre requiere credenciales de app.\n"
-            "   1. Registrá tu app gratis en: https://developers.mercadolibre.com.ar\n"
-            "   2. Copiá APP_ID y SECRET_KEY al archivo .env:\n"
-            "      ML_APP_ID=1234567890\n"
-            "      ML_APP_SECRET=tu_secret_key\n"
-        )
+    base_url = f"https://listado.mercadolibre.com.ar/pagina/{nickname}/"
 
-    resp = requests.post(
-        f"{API_BASE}/oauth/token",
-        data={
-            "grant_type":    "client_credentials",
-            "client_id":     ML_APP_ID,
-            "client_secret": ML_APP_SECRET,
-        },
-        timeout=15,
-    )
-    resp.raise_for_status()
-    data = resp.json()
-    _ml_token["access_token"] = data["access_token"]
-    # Renovar 5 minutos antes de que expire
-    _ml_token["expires_at"]   = _time.time() + data.get("expires_in", 21600) - 300
-    print(f"      [✓] Token ML obtenido (expira en {data.get('expires_in',0)//3600}hs)")
-    return _ml_token["access_token"]
+    def _extraer_cards(page) -> list[dict]:
+        cards = page.query_selector_all(".poly-card")
+        resultados = []
+        for card in cards:
+            try:
+                link_el = card.query_selector("a.poly-component__title, a[href*='mercadolibre']")
+                href = link_el.get_attribute("href") if link_el else ""
+
+                title_el = card.query_selector(".poly-component__title")
+                title = (title_el.inner_text() or "").strip()
+
+                # Precio: buscar el monto actual (no el tachado)
+                price_el = card.query_selector(
+                    ".poly-price__current .andes-money-amount__fraction"
+                )
+                if not price_el:
+                    price_el = card.query_selector(".andes-money-amount__fraction")
+                price_text = price_el.inner_text() if price_el else "0"
+                precio = _precio_desde_texto(price_text)
+
+                shipping_el = card.query_selector(".poly-component__shipping")
+                envio = "gratis" in (shipping_el.inner_text() if shipping_el else "").lower()
+
+                # Marca del card (texto del seller badge, e.g. "MONTAGNE")
+                seller_el = card.query_selector(".poly-component__seller")
+                marca_card = (seller_el.inner_text() or "").strip() if seller_el else ""
+
+                # Vendidos mostrados en el card (e.g. "+100 vendidos")
+                sold_el = card.query_selector(".poly-component__sold")
+                sold_text = (sold_el.inner_text() or "").strip() if sold_el else ""
+
+                wid = _wid_desde_url(href)
+                url_articulo = (
+                    f"https://articulo.mercadolibre.com.ar/{wid[:3]}-{wid[3:]}"
+                    if wid else ""
+                )
+
+                resultados.append({
+                    "titulo":       title,
+                    "precio":       precio,
+                    "item_id":      wid or "",
+                    "url_catalogo": href.split("?")[0] if href else "",
+                    "url_articulo": url_articulo,
+                    "envio_gratis": envio,
+                    "marca_card":   marca_card,
+                    "sold_card":    sold_text,
+                })
+            except Exception:
+                continue
+        return resultados
+
+    def _scrape_con_headless(headless: bool) -> list[dict]:
+        items = []
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=headless, args=["--no-sandbox"])
+            ctx = browser.new_context(
+                user_agent=_HEADERS_WEB["User-Agent"],
+                locale="es-AR",
+                extra_http_headers={"Accept-Language": "es-AR,es;q=0.9"},
+            )
+            page = ctx.new_page()
+
+            offset = 0
+            total_esperado = None
+
+            while True:
+                if offset == 0:
+                    url = base_url
+                else:
+                    url = f"{base_url}_Desde_{offset + 1}_NoIndex_True"
+
+                page.goto(url, wait_until="domcontentloaded", timeout=45000)
+                page.wait_for_timeout(2500 if headless else 3500)
+
+                # Leer total de resultados en la primera página
+                if total_esperado is None:
+                    total_el = page.query_selector(".ui-search-search-result__quantity-results")
+                    if total_el:
+                        t = re.search(r'([\d.]+)', total_el.inner_text().replace(".", ""))
+                        total_esperado = int(t.group(1)) if t else 9999
+                    else:
+                        total_esperado = 9999
+
+                cards = _extraer_cards(page)
+                if not cards:
+                    break
+
+                items.extend(cards)
+                print(f"      Página {offset//48 + 1}: {len(cards)} productos ({len(items)}/{total_esperado})")
+
+                offset += 48
+                if len(items) >= total_esperado:
+                    break
+
+                time.sleep(DELAY_LISTING)
+
+            browser.close()
+        return items
+
+    print("      Intentando con navegador invisible…")
+    items = _scrape_con_headless(headless=True)
+
+    if not items:
+        print("      Sin resultados headless — abriendo navegador visible…")
+        items = _scrape_con_headless(headless=False)
+
+    return items
 
 
-def _headers() -> dict:
-    """Retorna los headers con Bearer token para las requests a ML."""
-    return {"Authorization": f"Bearer {obtener_ml_token()}"}
-
-
-# ─── MercadoLibre API ──────────────────────────────────────────────────────────
-
-def obtener_seller_id(nickname: str) -> tuple:
-    """Resuelve seller_id y nombre oficial a partir del nickname."""
-    resp = requests.get(
-        f"{API_BASE}/sites/MLA/search",
-        params={"nickname": nickname, "limit": 1},
-        headers=_headers(),
-        timeout=15,
-    )
-    resp.raise_for_status()
-    resultados = resp.json().get("results", [])
-    if not resultados:
-        raise ValueError(f"Vendedor '{nickname}' no encontrado.")
-    seller = resultados[0]["seller"]
-    return seller["id"], seller.get("nickname", nickname)
-
-
-def obtener_ids_publicaciones(seller_id: int) -> list[str]:
-    """Recupera todos los IDs de publicaciones activas con paginación."""
-    ids, offset, limit = [], 0, 50
-    while True:
-        resp = requests.get(
-            f"{API_BASE}/sites/MLA/search",
-            params={"seller_id": seller_id, "status": "active", "limit": limit, "offset": offset},
-            headers=_headers(),
-            timeout=15,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        for item in data.get("results", []):
-            ids.append(item["id"])
-        total  = data.get("paging", {}).get("total", 0)
-        offset += limit
-        if offset >= min(total, MAX_ITEMS):
-            break
-    return ids
-
+# ─── Scraping: detalle de cada publicación (requests) ────────────────────────
 
 def _limpiar_tipo(domain_id: str) -> str:
-    """Convierte 'MLA-AIR_CONDITIONERS' en 'Air Conditioners'."""
     return domain_id.replace("MLA-", "").replace("_", " ").title() if domain_id else "—"
 
 
-def obtener_detalle_items(ids: list[str]) -> list[dict]:
+def scrape_item_detalle(item: dict) -> dict:
     """
-    Descarga precio, stock, ventas, marca, tipo de producto y variantes
-    usando el endpoint multiget (20 ítems por request).
+    Descarga la página individual del ítem y extrae vendidos, stock, marca y tipo.
+    Modifica el dict in-place y lo retorna.
     """
-    items = []
-    hoy   = datetime.now(timezone.utc)
+    url = item.get("url_articulo", "")
+    if not url:
+        item.setdefault("vendidos", 0)
+        item.setdefault("stock", None)
+        item.setdefault("marca", item.get("marca_card", "Sin marca") or "Sin marca")
+        item.setdefault("tipo", "—")
+        item.setdefault("condicion", "new")
+        item.setdefault("dias_activo", 1)
+        item.setdefault("ventas_hist_dia", 0.0)
+        item.setdefault("ventas_rec_dia", None)
+        item.setdefault("variantes", [])
+        item.setdefault("permalink", item.get("url_catalogo", ""))
+        return item
 
-    for i in range(0, len(ids), 20):
-        chunk = ids[i : i + 20]
-        resp  = requests.get(f"{API_BASE}/items", params={"ids": ",".join(chunk)}, headers=_headers(), timeout=15)
-        resp.raise_for_status()
+    try:
+        r = requests.get(url, headers=_HEADERS_WEB, timeout=20, allow_redirects=True)
+        html = r.text
 
-        for entry in resp.json():
-            if entry.get("code") != 200:
-                continue
-            b = entry["body"]
+        # Vendidos
+        m = re.search(r'(\d[\d.]*)\s+vendidos?', html, re.IGNORECASE)
+        vendidos = int(m.group(1).replace(".", "")) if m else 0
 
-            # Marca desde el array de atributos
-            marca = next(
-                (a["value_name"] for a in b.get("attributes", []) if a.get("id") == "BRAND"),
-                "Sin marca",
-            )
+        # Stock disponible
+        m = re.search(r'available_quantity[\":\s]+(\d+)', html)
+        stock = int(m.group(1)) if m else None
 
-            # Días activo desde date_created
-            fecha_creacion = b.get("date_created", "")
-            dias_activo    = 1
-            if fecha_creacion:
-                try:
-                    dt_creacion = datetime.fromisoformat(fecha_creacion)
-                    if dt_creacion.tzinfo is None:
-                        dt_creacion = dt_creacion.replace(tzinfo=timezone.utc)
-                    dias_activo = max(1, (hoy - dt_creacion).days)
-                except ValueError:
-                    pass
+        # Marca desde tabla de specs
+        m = re.search(
+            r'>Marca<.*?class="andes-table__column--value"[^>]*>([^<]+)</span>',
+            html, re.DOTALL
+        )
+        marca = (m.group(1).strip() if m else item.get("marca_card", "")) or "Sin marca"
 
-            vendidos      = b.get("sold_quantity", 0)
-            ventas_hist   = round(vendidos / dias_activo, 2)
-            envio_gratis  = (
-                "free_shipping" in b.get("shipping", {}).get("tags", [])
-                or b.get("shipping", {}).get("free_shipping", False)
-            )
+        # Tipo de producto desde domain_id
+        domain_ids = re.findall(r'"domain_id":\s*"([^"]+)"', html)
+        tipo = _limpiar_tipo(domain_ids[0]) if domain_ids else "—"
 
-            # Variantes: lista de {descripcion, stock, vendidos}
-            variantes = []
-            for v in b.get("variations", []):
-                desc = " / ".join(
-                    f"{a['name']}: {a.get('value_name','?')}"
-                    for a in v.get("attribute_combinations", [])
-                )
-                variantes.append({
-                    "descripcion": desc or "Sin variante",
-                    "stock":       v.get("available_quantity", 0),
-                    "vendidos":    v.get("sold_quantity", 0),
-                })
+        # Condición
+        cond_hits = re.findall(r'"condition":\s*"([^"]+)"', html)
+        condicion = cond_hits[0] if cond_hits else "new"
 
-            items.append({
-                "id":            b.get("id"),
-                "titulo":        b.get("title"),
-                "marca":         marca,
-                "tipo":          _limpiar_tipo(b.get("domain_id", "")),
-                "categoria_id":  b.get("category_id", ""),
-                "precio":        b.get("price"),
-                "stock":         b.get("available_quantity", 0),
-                "vendidos":      vendidos,
-                "dias_activo":   dias_activo,
-                "ventas_hist_dia": ventas_hist,
-                "ventas_rec_dia":  None,   # se completa en comparar_snapshots
-                "condicion":     b.get("condition"),
-                "envio_gratis":  envio_gratis,
-                "permalink":     b.get("permalink"),
-                "variantes":     variantes,
-            })
+    except Exception as e:
+        vendidos, stock, marca, tipo, condicion = 0, None, item.get("marca_card", "Sin marca"), "—", "new"
 
-    return items
+    # Actualizar el dict
+    item["vendidos"]       = vendidos
+    item["stock"]          = stock
+    item["marca"]          = marca
+    item["tipo"]           = tipo
+    item["condicion"]      = condicion
+    item["dias_activo"]    = 1         # sin fecha de creación disponible
+    item["ventas_hist_dia"] = vendidos  # usamos total vendidos como proxy del historial
+    item["ventas_rec_dia"]  = None      # se calcula al comparar snapshots
+    item["variantes"]      = []
+    item["permalink"]      = item.get("url_articulo") or item.get("url_catalogo", "")
+
+    return item
+
+
+def enriquecer_items_paralelo(raw_items: list[dict]) -> list[dict]:
+    """Llama scrape_item_detalle en paralelo para todos los ítems."""
+    total = len(raw_items)
+    resultados = [None] * total
+    completados = [0]
+
+    with ThreadPoolExecutor(max_workers=WORKERS) as executor:
+        futuros = {executor.submit(scrape_item_detalle, item): i
+                   for i, item in enumerate(raw_items)}
+        for fut in as_completed(futuros):
+            idx = futuros[fut]
+            try:
+                resultados[idx] = fut.result()
+            except Exception:
+                resultados[idx] = raw_items[idx]
+            completados[0] += 1
+            if completados[0] % 50 == 0:
+                print(f"      {completados[0]}/{total} ítems procesados…")
+
+    return [r for r in resultados if r is not None]
 
 
 # ─── Snapshot anterior ─────────────────────────────────────────────────────────
@@ -246,8 +316,7 @@ def cargar_reporte_anterior(nickname: str, carpeta: Path) -> tuple:
     ruta = archivos[-2]
     print(f"[i] Comparando contra: {Path(ruta).name}")
 
-    # Fecha del snapshot anterior desde el nombre de archivo
-    stem   = Path(ruta).stem                       # NICKNAME_YYYYMMDD_HHMMSS
+    stem   = Path(ruta).stem
     partes = stem.split("_")
     try:
         fecha_ant = datetime.strptime(f"{partes[-2]}_{partes[-1]}", "%Y%m%d_%H%M%S")
@@ -256,8 +325,6 @@ def cargar_reporte_anterior(nickname: str, carpeta: Path) -> tuple:
 
     wb = openpyxl.load_workbook(ruta)
     ws = wb.active
-
-    # Leer encabezados para encontrar columnas por nombre
     encabezados = {cell.value: cell.column for cell in ws[1]}
     col_id  = encabezados.get("ID", 1)
     col_pre = encabezados.get("Precio (ARS)", 5)
@@ -284,19 +351,15 @@ def comparar_snapshots(
     fecha_actual: datetime,
     fecha_ant:    Optional[datetime],
 ) -> dict:
-    """
-    Detecta cambios de precio y stock, estima ventas y calcula ventas_rec_dia por ítem.
-    Modifica actuales in-place para agregar ventas_rec_dia.
-    """
     if not anteriores:
         return {
-            "cambios_precio":   [],
-            "cambios_stock":    [],
-            "ventas_estimadas": 0,
+            "cambios_precio":       [],
+            "cambios_stock":        [],
+            "ventas_estimadas":     0,
             "ventas_rec_dia_total": None,
-            "delta_dias":       None,
-            "nuevos":           [i["id"] for i in actuales],
-            "eliminados":       [],
+            "delta_dias":           None,
+            "nuevos":               [i["item_id"] for i in actuales],
+            "eliminados":           [],
         }
 
     delta_dias = (
@@ -304,27 +367,25 @@ def comparar_snapshots(
         if fecha_ant else None
     )
 
-    ids_actuales  = {i["id"] for i in actuales}
+    ids_actuales   = {i["item_id"] for i in actuales}
     ids_anteriores = set(anteriores.keys())
     cambios_precio, cambios_stock = [], []
     ventas_est = 0
 
     for item in actuales:
-        iid  = item["id"]
+        iid  = item["item_id"]
         prev = anteriores.get(iid)
         if not prev:
             continue
 
-        # Cambio de precio
         p_ant, p_act = (prev["precio"] or 0), (item["precio"] or 0)
-        if p_ant != p_act:
-            pct = ((p_act - p_ant) / p_ant * 100) if p_ant else 0
+        if p_ant and p_act and p_ant != p_act:
+            pct = (p_act - p_ant) / p_ant * 100
             cambios_precio.append({
                 "id": iid, "titulo": item["titulo"],
                 "antes": p_ant, "ahora": p_act, "delta%": round(pct, 1),
             })
 
-        # Cambio de stock
         s_ant, s_act = (prev["stock"] or 0), (item["stock"] or 0)
         if s_ant != s_act:
             cambios_stock.append({
@@ -332,7 +393,6 @@ def comparar_snapshots(
                 "antes": s_ant, "ahora": s_act,
             })
 
-        # Delta de ventas y tasa diaria reciente
         delta_v = max(0, (item["vendidos"] or 0) - (prev["vendidos"] or 0))
         ventas_est += delta_v
         if delta_dias:
@@ -358,7 +418,8 @@ VERDE  = "0F9D58"
 GRIS   = "F5F5F5"
 BLANCO = "FFFFFF"
 
-def _estilo_encabezado(ws, fila: int, cols: list[str], color: str = AZUL):
+
+def _estilo_encabezado(ws, fila: int, cols: list, color: str = AZUL):
     fill = PatternFill("solid", fgColor=color)
     font = Font(bold=True, color=BLANCO)
     for col, texto in enumerate(cols, start=1):
@@ -366,6 +427,7 @@ def _estilo_encabezado(ws, fila: int, cols: list[str], color: str = AZUL):
         c.fill, c.font = fill, font
         c.alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[fila].height = 20
+
 
 def _autowidth(ws, max_w=70):
     for col in ws.columns:
@@ -380,28 +442,27 @@ def guardar_excel(
     carpeta: Path,
     cambios: dict,
 ) -> Path:
-    """Crea el Excel con tres hojas: Publicaciones, Por Marca, Variantes."""
     ts   = fecha.strftime("%Y%m%d_%H%M%S")
     ruta = carpeta / f"{nickname}_{ts}.xlsx"
     wb   = openpyxl.Workbook()
 
-    # ── Hoja 1: Publicaciones ─────────────────────────────────────────────────
+    fill_alt = PatternFill("solid", fgColor=GRIS)
+
+    # ── Hoja 1: Publicaciones ──────────────────────────────────────────────────
     ws1 = wb.active
     ws1.title = "Publicaciones"
     cols1 = [
         "ID", "Título", "Marca", "Tipo de Producto",
         "Precio (ARS)", "Stock Total", "Vendidos Totales",
-        "Días Activo", "Ventas Hist/Día", "Ventas Rec/Día",
-        "Condición", "Envío Gratis", "URL",
+        "Ventas Rec/Día", "Condición", "Envío Gratis", "URL",
     ]
     _estilo_encabezado(ws1, 1, cols1)
 
-    fill_alt = PatternFill("solid", fgColor=GRIS)
     for r, it in enumerate(items, start=2):
+        stock_str = it["stock"] if it["stock"] is not None else "N/D"
         fila = [
-            it["id"], it["titulo"], it["marca"], it["tipo"],
-            it["precio"], it["stock"], it["vendidos"],
-            it["dias_activo"], it["ventas_hist_dia"],
+            it["item_id"], it["titulo"], it["marca"], it["tipo"],
+            it["precio"], stock_str, it["vendidos"],
             it["ventas_rec_dia"] if it["ventas_rec_dia"] is not None else "—",
             it["condicion"], "Sí" if it["envio_gratis"] else "No", it["permalink"],
         ]
@@ -415,31 +476,24 @@ def guardar_excel(
 
     # ── Hoja 2: Por Marca ─────────────────────────────────────────────────────
     ws2 = wb.create_sheet("Por Marca")
-    cols2 = ["Marca", "Publicaciones", "Stock Total", "Vendidos Totales",
-             "Ventas Hist/Día", "Ventas Rec/Día"]
+    cols2 = ["Marca", "Publicaciones", "Stock Total", "Vendidos Totales", "Ventas Rec/Día"]
     _estilo_encabezado(ws2, 1, cols2, VERDE)
 
-    # Agrupar por marca
-    marcas: dict[str, dict] = defaultdict(lambda: {
-        "pubs": 0, "stock": 0, "vendidos": 0, "hist": 0.0, "rec": 0.0, "rec_count": 0
-    })
+    marcas: dict = defaultdict(lambda: {"pubs": 0, "stock": 0, "vendidos": 0, "rec": 0.0, "rc": 0})
     for it in items:
         m = it["marca"]
         marcas[m]["pubs"]     += 1
-        marcas[m]["stock"]    += it["stock"]
+        marcas[m]["stock"]    += (it["stock"] or 0)
         marcas[m]["vendidos"] += it["vendidos"]
-        marcas[m]["hist"]     += it["ventas_hist_dia"]
         if it["ventas_rec_dia"] is not None:
-            marcas[m]["rec"]       += it["ventas_rec_dia"]
-            marcas[m]["rec_count"] += 1
+            marcas[m]["rec"] += it["ventas_rec_dia"]
+            marcas[m]["rc"]  += 1
 
-    # Ordenar por ventas históricas descendente
     for r, (marca, d) in enumerate(
-        sorted(marcas.items(), key=lambda x: x[1]["hist"], reverse=True), start=2
+        sorted(marcas.items(), key=lambda x: x[1]["vendidos"], reverse=True), start=2
     ):
-        rec = round(d["rec"], 2) if d["rec_count"] else "—"
-        fila = [marca, d["pubs"], d["stock"], d["vendidos"], round(d["hist"], 2), rec]
-        for c, val in enumerate(fila, start=1):
+        rec = round(d["rec"], 2) if d["rc"] else "—"
+        for c, val in enumerate([marca, d["pubs"], d["stock"], d["vendidos"], rec], start=1):
             celda = ws2.cell(row=r, column=c, value=val)
             if r % 2 == 0:
                 celda.fill = fill_alt
@@ -447,30 +501,25 @@ def guardar_excel(
     ws2.freeze_panes = "A2"
     _autowidth(ws2)
 
-    # ── Hoja 3: Variantes ─────────────────────────────────────────────────────
-    ws3 = wb.create_sheet("Variantes")
-    cols3 = ["Item ID", "Título", "Marca", "Tipo", "Variante", "Stock Variante", "Vendidos Variante"]
+    # ── Hoja 3: Por Tipo de Producto ───────────────────────────────────────────
+    ws3 = wb.create_sheet("Por Tipo")
+    cols3 = ["Tipo de Producto", "Publicaciones", "Stock Total", "Vendidos Totales"]
     _estilo_encabezado(ws3, 1, cols3, "7B1FA2")
 
-    r = 2
+    tipos: dict = defaultdict(lambda: {"pubs": 0, "stock": 0, "vendidos": 0})
     for it in items:
-        if not it["variantes"]:
-            # Ítem sin variantes: una sola fila con el stock total
-            ws3.append([it["id"], it["titulo"], it["marca"], it["tipo"],
-                        "Sin variantes", it["stock"], it["vendidos"]])
+        t = it["tipo"]
+        tipos[t]["pubs"]     += 1
+        tipos[t]["stock"]    += (it["stock"] or 0)
+        tipos[t]["vendidos"] += it["vendidos"]
+
+    for r, (tipo, d) in enumerate(
+        sorted(tipos.items(), key=lambda x: x[1]["vendidos"], reverse=True), start=2
+    ):
+        for c, val in enumerate([tipo, d["pubs"], d["stock"], d["vendidos"]], start=1):
+            celda = ws3.cell(row=r, column=c, value=val)
             if r % 2 == 0:
-                for c in range(1, 8):
-                    ws3.cell(row=r, column=c).fill = fill_alt
-            r += 1
-        else:
-            for v in it["variantes"]:
-                fila_v = [it["id"], it["titulo"], it["marca"], it["tipo"],
-                          v["descripcion"], v["stock"], v["vendidos"]]
-                for c, val in enumerate(fila_v, start=1):
-                    celda = ws3.cell(row=r, column=c, value=val)
-                    if r % 2 == 0:
-                        celda.fill = fill_alt
-                r += 1
+                celda.fill = fill_alt
 
     ws3.freeze_panes = "A2"
     _autowidth(ws3)
@@ -489,61 +538,56 @@ def generar_html(
     cambios: dict,
     carpeta: Path,
 ) -> Path:
-    """Genera un dashboard HTML estático que se abre en el navegador."""
     ts   = fecha.strftime("%Y%m%d_%H%M%S")
     ruta = carpeta / f"{nickname}_{ts}.html"
 
-    total_stock    = sum(i["stock"] for i in items)
+    total_stock    = sum((i["stock"] or 0) for i in items)
     total_vendidos = sum(i["vendidos"] for i in items)
-    ventas_hist_total = sum(i["ventas_hist_dia"] for i in items)
     precio_prom    = (
         sum(i["precio"] for i in items if i["precio"]) / len(items) if items else 0
     )
 
-    # ── Top 10 marcas por ventas históricas ──
-    marcas: dict[str, dict] = defaultdict(lambda: {"pubs": 0, "hist": 0.0, "rec": 0.0, "rc": 0})
+    marcas: dict = defaultdict(lambda: {"pubs": 0, "vendidos": 0, "rec": 0.0, "rc": 0})
     for it in items:
         m = it["marca"]
-        marcas[m]["pubs"] += 1
-        marcas[m]["hist"] += it["ventas_hist_dia"]
+        marcas[m]["pubs"]     += 1
+        marcas[m]["vendidos"] += it["vendidos"]
         if it["ventas_rec_dia"] is not None:
             marcas[m]["rec"] += it["ventas_rec_dia"]
             marcas[m]["rc"]  += 1
-    top_marcas = sorted(marcas.items(), key=lambda x: x[1]["hist"], reverse=True)[:10]
+
+    top_marcas = sorted(marcas.items(), key=lambda x: x[1]["vendidos"], reverse=True)[:12]
 
     filas_marcas = ""
     for i, (m, d) in enumerate(top_marcas, 1):
         rec = f"{d['rec']:.1f}" if d["rc"] else "—"
         filas_marcas += (
             f"<tr><td>{i}</td><td><strong>{m}</strong></td>"
-            f"<td>{d['pubs']}</td>"
-            f"<td>{d['hist']:.1f}</td>"
-            f"<td>{rec}</td></tr>\n"
+            f"<td>{d['pubs']}</td><td>{d['vendidos']:,}</td><td>{rec}</td></tr>\n"
         )
 
-    # ── Tabla de publicaciones (top 200 por ventas históricas) ──
-    top_items = sorted(items, key=lambda x: x["ventas_hist_dia"], reverse=True)[:200]
+    top_items = sorted(items, key=lambda x: x["vendidos"], reverse=True)[:300]
     filas_items = ""
     for it in top_items:
-        rec  = f"{it['ventas_rec_dia']:.2f}" if it["ventas_rec_dia"] is not None else "—"
-        env  = "✅" if it["envio_gratis"] else "❌"
+        rec   = f"{it['ventas_rec_dia']:.2f}" if it["ventas_rec_dia"] is not None else "—"
+        env   = "✅" if it["envio_gratis"] else "❌"
+        stock = it["stock"] if it["stock"] is not None else "N/D"
         filas_items += (
             f"<tr>"
-            f"<td><a href='{it['permalink']}' target='_blank'>{it['titulo'][:60]}</a></td>"
+            f"<td><a href='{it['permalink']}' target='_blank'>{it['titulo'][:65]}</a></td>"
             f"<td>{it['marca']}</td>"
             f"<td>{it['tipo']}</td>"
             f"<td>${it['precio']:,.0f}</td>"
-            f"<td>{it['stock']}</td>"
-            f"<td>{it['vendidos']}</td>"
-            f"<td>{it['ventas_hist_dia']:.2f}</td>"
+            f"<td>{stock}</td>"
+            f"<td>{it['vendidos']:,}</td>"
             f"<td>{rec}</td>"
             f"<td>{env}</td>"
             f"</tr>\n"
         )
 
     ventas_est_str = (
-        f"{cambios['ventas_estimadas']} uds en {cambios['delta_dias']} días "
-        f"(≈ {cambios['ventas_rec_dia_total']}/día)"
+        f"{cambios['ventas_estimadas']:,} uds en {cambios['delta_dias']} días "
+        f"(≈ <strong>{cambios['ventas_rec_dia_total']}</strong>/día)"
         if cambios.get("ventas_rec_dia_total") is not None
         else "Primer snapshot — sin comparación aún"
     )
@@ -576,49 +620,45 @@ def generar_html(
         tr:nth-child(even):hover td {{ background: #f0f7ff; }}
         a {{ color: #1A73E8; text-decoration: none; }}
         a:hover {{ text-decoration: underline; }}
-        .chip {{ display: inline-block; padding: 2px 8px; border-radius: 12px;
-                 font-size: .75rem; background: #e8f0fe; color: #1A73E8; }}
         footer {{ text-align: center; padding: 20px; font-size: .75rem; color: #aaa; }}
-        input[type=text] {{ width: 100%; padding: 10px 16px; font-size: .9rem;
-                            border: 1px solid #ddd; border-radius: 6px; margin: 12px 20px;
-                            width: calc(100% - 40px); }}
+        input[type=text] {{ width: calc(100% - 40px); padding: 10px 16px; font-size: .9rem;
+                            border: 1px solid #ddd; border-radius: 6px; margin: 12px 20px; }}
       </style>
     </head>
     <body>
     <header>
-      <h1>📊 Reporte MercadoLibre — {nickname}</h1>
+      <h1>Reporte MercadoLibre — {nickname}</h1>
       <p>Generado el {fecha.strftime('%d/%m/%Y a las %H:%M')}</p>
     </header>
 
     <div class="cards">
       <div class="card"><div class="val">{len(items)}</div><div class="lbl">Publicaciones activas</div></div>
       <div class="card"><div class="val">{total_stock:,}</div><div class="lbl">Stock total disponible</div></div>
-      <div class="card"><div class="val">{total_vendidos:,}</div><div class="lbl">Unidades vendidas (totales)</div></div>
-      <div class="card"><div class="val">{ventas_hist_total:.0f}</div><div class="lbl">Ventas históricas/día (suma)</div></div>
+      <div class="card"><div class="val">{total_vendidos:,}</div><div class="lbl">Unidades vendidas (acumulado)</div></div>
       <div class="card"><div class="val">${precio_prom:,.0f}</div><div class="lbl">Precio promedio ARS</div></div>
       <div class="card"><div class="val">{len(cambios.get('cambios_precio',[]))}</div><div class="lbl">Cambios de precio</div></div>
     </div>
 
     <section>
-      <h2>🚀 Ventas estimadas vs. reporte anterior</h2>
+      <h2>Ventas estimadas vs. reporte anterior</h2>
       <p style="padding:14px 20px;font-size:.9rem;">{ventas_est_str}</p>
     </section>
 
     <section>
-      <h2>🏷️ Top marcas por ventas históricas/día</h2>
+      <h2>Top marcas por unidades vendidas</h2>
       <table>
-        <tr><th>#</th><th>Marca</th><th>Publicaciones</th><th>Ventas Hist/Día</th><th>Ventas Rec/Día</th></tr>
+        <tr><th>#</th><th>Marca</th><th>Publicaciones</th><th>Vendidos totales</th><th>Ventas Rec/Día</th></tr>
         {filas_marcas}
       </table>
     </section>
 
     <section>
-      <h2>📦 Publicaciones (top 200 por ventas)</h2>
+      <h2>Publicaciones (top 300 por vendidos)</h2>
       <input type="text" id="buscar" placeholder="Filtrar por título, marca o tipo…" oninput="filtrar()">
       <table id="tabla">
         <tr>
           <th>Título</th><th>Marca</th><th>Tipo</th><th>Precio</th>
-          <th>Stock</th><th>Vendidos</th><th>Hist/Día</th><th>Rec/Día</th><th>Env. Gratis</th>
+          <th>Stock</th><th>Vendidos</th><th>Rec/Día</th><th>Env. Gratis</th>
         </tr>
         {filas_items}
       </table>
@@ -648,10 +688,9 @@ def generar_html(
 def armar_mensaje(nickname: str, items: list[dict], cambios: dict, fecha: datetime) -> str:
     ts = fecha.strftime("%d/%m/%Y %H:%M")
 
-    # Top 5 marcas
-    marcas: dict[str, float] = defaultdict(float)
+    marcas: dict = defaultdict(int)
     for it in items:
-        marcas[it["marca"]] += it["ventas_hist_dia"]
+        marcas[it["marca"]] += it["vendidos"]
     top5 = sorted(marcas.items(), key=lambda x: x[1], reverse=True)[:5]
 
     ventas_rec = (
@@ -661,24 +700,24 @@ def armar_mensaje(nickname: str, items: list[dict], cambios: dict, fecha: dateti
     )
 
     lineas = [
-        f"📊 *Reporte ML* — {ts}",
-        f"🏪 *{nickname}*",
-        f"📦 Publicaciones: {len(items)} | Stock total: {sum(i['stock'] for i in items):,}",
-        f"🚀 Ventas estimadas: {ventas_rec}",
+        f"*Reporte ML* — {ts}",
+        f"*{nickname}*",
+        f"Publicaciones: {len(items)} | Stock total: {sum((i['stock'] or 0) for i in items):,}",
+        f"Ventas estimadas: {ventas_rec}",
         "",
-        "🏷️ *Top marcas (ventas hist/día):*",
+        "*Top marcas (vendidos acum.):*",
     ]
     for m, v in top5:
-        lineas.append(f"  • {m}: {v:.1f}/día")
+        lineas.append(f"  • {m}: {v:,} uds vendidas")
 
     if cambios["cambios_precio"]:
-        lineas.append(f"\n💲 Cambios de precio: {len(cambios['cambios_precio'])}")
+        lineas.append(f"\nCambios de precio: {len(cambios['cambios_precio'])}")
         for cp in cambios["cambios_precio"][:3]:
             signo = "▲" if cp["delta%"] > 0 else "▼"
             lineas.append(f"  {signo} {cp['titulo'][:35]}… ({cp['delta%']:+.1f}%)")
 
     if cambios["cambios_stock"]:
-        lineas.append(f"\n📉 Cambios de stock: {len(cambios['cambios_stock'])}")
+        lineas.append(f"\nCambios de stock: {len(cambios['cambios_stock'])}")
 
     lineas.append("\n_espiar_vendedor.py_")
     return "\n".join(lineas)
@@ -700,49 +739,52 @@ def enviar_whatsapp(mensaje: str) -> None:
 
 def main():
     parser = argparse.ArgumentParser(description="Espía publicaciones de un vendedor ML Argentina.")
-    parser.add_argument("nickname", help="Nickname del vendedor")
+    parser.add_argument("nickname", help="Nickname del vendedor (ej: todoairelibregd)")
     parser.add_argument("--carpeta", default=None, help="Subcarpeta en reportes_ml/")
     args = parser.parse_args()
 
-    nickname_input = args.nickname.strip()
-    fecha_ahora    = datetime.now()
-    subcarpeta     = args.carpeta if args.carpeta else nickname_input.upper()
-    reports_dir    = REPORTS_ROOT / subcarpeta
+    nickname    = args.nickname.strip()
+    fecha_ahora = datetime.now()
+    subcarpeta  = args.carpeta if args.carpeta else nickname.upper()
+    reports_dir = REPORTS_ROOT / subcarpeta
     reports_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"\n=== Espiando: {nickname_input} | Carpeta: {reports_dir} ===\n")
+    print(f"\n=== Espiando: {nickname} | Carpeta: {reports_dir} ===\n")
 
-    print("[1/6] Buscando seller_id…")
-    seller_id, nickname_oficial = obtener_seller_id(nickname_input)
-    print(f"      ID={seller_id}  nombre='{nickname_oficial}'")
+    print("[1/5] Scraping páginas de la tienda con Playwright…")
+    t0 = time.time()
+    raw_items = scrape_paginas_vendedor(nickname)
+    print(f"      {len(raw_items)} publicaciones encontradas ({time.time()-t0:.0f}s)")
 
-    print("[2/6] Recuperando publicaciones activas…")
-    ids = obtener_ids_publicaciones(seller_id)
-    print(f"      {len(ids)} publicaciones.")
-    if not ids:
+    if not raw_items:
         print("      Sin publicaciones activas. Saliendo.")
         sys.exit(0)
 
-    print("[3/6] Descargando detalle de ítems…")
-    items = obtener_detalle_items(ids)
-    print(f"      {len(items)} ítems procesados.")
+    # Filtrar ítems sin item_id (catálogos sin wid, no son publicaciones del vendedor)
+    raw_items = [i for i in raw_items if i.get("item_id")]
+    print(f"      {len(raw_items)} con ID individual (wid).")
 
-    print("[4/6] Cargando reporte anterior para comparar…")
-    anteriores, fecha_ant = cargar_reporte_anterior(nickname_oficial, reports_dir)
+    print(f"\n[2/5] Descargando detalle de {len(raw_items)} publicaciones ({WORKERS} hilos)…")
+    t0 = time.time()
+    items = enriquecer_items_paralelo(raw_items)
+    print(f"      Listo en {time.time()-t0:.0f}s")
+
+    print("\n[3/5] Cargando reporte anterior para comparar…")
+    anteriores, fecha_ant = cargar_reporte_anterior(nickname, reports_dir)
     cambios = comparar_snapshots(items, anteriores, fecha_ahora, fecha_ant)
 
-    print("[5/6] Guardando Excel y HTML…")
-    guardar_excel(items, nickname_oficial, fecha_ahora, reports_dir, cambios)
-    generar_html(items, nickname_oficial, fecha_ahora, cambios, reports_dir)
+    print("\n[4/5] Guardando Excel y HTML…")
+    guardar_excel(items, nickname, fecha_ahora, reports_dir, cambios)
+    generar_html(items, nickname, fecha_ahora, cambios, reports_dir)
 
-    # Resumen en consola
-    ventas_hist_total = sum(i["ventas_hist_dia"] for i in items)
+    total_vendidos = sum(i["vendidos"] for i in items)
+    total_stock    = sum((i["stock"] or 0) for i in items)
+
     print(f"""
 ── Resumen ──────────────────────────────────────
    Publicaciones activas : {len(items)}
-   Stock total           : {sum(i['stock'] for i in items):,}
-   Ventas totales (hist) : {sum(i['vendidos'] for i in items):,}
-   Ventas hist/día       : {ventas_hist_total:.1f} uds/día
+   Stock total           : {total_stock:,}
+   Ventas acumuladas     : {total_vendidos:,} uds
    Ventas rec/día        : {cambios['ventas_rec_dia_total'] or 'Primer snapshot'}
    Cambios de precio     : {len(cambios['cambios_precio'])}
    Cambios de stock      : {len(cambios['cambios_stock'])}
@@ -750,8 +792,8 @@ def main():
    Eliminadas            : {len(cambios['eliminados'])}
 ─────────────────────────────────────────────────""")
 
-    print("[6/6] Enviando WhatsApp…")
-    enviar_whatsapp(armar_mensaje(nickname_oficial, items, cambios, fecha_ahora))
+    print("[5/5] Enviando WhatsApp…")
+    enviar_whatsapp(armar_mensaje(nickname, items, cambios, fecha_ahora))
 
     print("\n=== Listo ===\n")
 
