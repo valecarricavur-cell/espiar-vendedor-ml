@@ -15,7 +15,7 @@
   },
   "agentes": {
     "espionaje": true,
-    "contenido": false,
+    "contenido": true,
     "fotos": false
   },
   "notificar_por": ["whatsapp"]

@@ -132,9 +132,9 @@ def correr_espionaje(cliente: dict) -> bool:
 
 
 def correr_contenido(cliente: dict) -> bool:
-    """Agente de contenido — generación con IA (próximamente)."""
-    print("      [contenido] Agente en construcción.")
-    return True
+    """Agente de contenido — análisis, ideas Instagram y plan de acción con IA."""
+    from agentes.contenido import ejecutar
+    return ejecutar(cliente)
 
 
 def correr_fotos(cliente: dict) -> bool:
