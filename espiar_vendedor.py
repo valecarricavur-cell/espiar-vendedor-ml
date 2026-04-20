@@ -216,67 +216,99 @@ def _limpiar_tipo(domain_id: str) -> str:
     return domain_id.replace("MLA-", "").replace("_", " ").title() if domain_id else "—"
 
 
+def _extraer_datos_html(html: str, item: dict) -> bool:
+    """
+    Intenta extraer datos del HTML de una página de producto de ML.
+    Retorna True si extrajo datos válidos, False si es página de bloqueo.
+    """
+    if "suspicious-traffic-frontend" in html or len(html) < 50_000:
+        return False
+
+    m = re.search(r'(\d[\d.]*)\s+vendidos?', html, re.IGNORECASE)
+    item["vendidos"] = int(m.group(1).replace(".", "")) if m else 0
+
+    m = re.search(r'available_quantity[\":\s]+(\d+)', html)
+    item["stock"] = int(m.group(1)) if m else None
+
+    m = re.search(
+        r'>Marca<.*?class="andes-table__column--value"[^>]*>([^<]+)</span>',
+        html, re.DOTALL
+    )
+    item["marca"] = (m.group(1).strip() if m else item.get("marca_card", "")) or "Sin marca"
+
+    m = re.search(r'"title":\s*"([^"]{10,})"', html)
+    if m and not item.get("titulo"):
+        item["titulo"] = m.group(1)
+
+    m = re.search(r'"price":\s*([\d.]+)', html)
+    if m and not item.get("precio"):
+        item["precio"] = float(m.group(1))
+
+    domain_ids = re.findall(r'"domain_id":\s*"([^"]+)"', html)
+    item["tipo"] = _limpiar_tipo(domain_ids[0]) if domain_ids else "—"
+
+    cond_hits = re.findall(r'"condition":\s*"([^"]+)"', html)
+    item["condicion"] = cond_hits[0] if cond_hits else "new"
+
+    ship_hits = re.findall(r'"free_shipping":\s*(true|false)', html)
+    if ship_hits and not item.get("envio_gratis"):
+        item["envio_gratis"] = ship_hits[0] == "true"
+
+    return True
+
+
+def _scrape_con_playwright_simple(url: str) -> str:
+    """Abre una URL con Playwright y retorna el HTML renderizado."""
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        ctx = browser.new_context(
+            user_agent=_HEADERS_WEB["User-Agent"],
+            locale="es-AR",
+        )
+        page = ctx.new_page()
+        page.goto(url, wait_until="domcontentloaded", timeout=30000)
+        page.wait_for_timeout(2500)
+        html = page.content()
+        browser.close()
+    return html
+
+
 def scrape_item_detalle(item: dict) -> dict:
     """
     Descarga la página individual del ítem y extrae vendidos, stock, marca y tipo.
-    Modifica el dict in-place y lo retorna.
+    Si requests devuelve una página de bloqueo, reintenta con Playwright.
     """
     url = item.get("url_articulo", "")
+
+    # Defaults en caso de fallo total
+    item.setdefault("vendidos",       0)
+    item.setdefault("stock",          None)
+    item.setdefault("marca",          item.get("marca_card", "Sin marca") or "Sin marca")
+    item.setdefault("tipo",           "—")
+    item.setdefault("condicion",      "new")
+    item.setdefault("dias_activo",    1)
+    item.setdefault("ventas_rec_dia", None)
+    item.setdefault("variantes",      [])
+    item.setdefault("permalink",      url or item.get("url_catalogo", ""))
+
     if not url:
-        item.setdefault("vendidos", 0)
-        item.setdefault("stock", None)
-        item.setdefault("marca", item.get("marca_card", "Sin marca") or "Sin marca")
-        item.setdefault("tipo", "—")
-        item.setdefault("condicion", "new")
-        item.setdefault("dias_activo", 1)
-        item.setdefault("ventas_hist_dia", 0.0)
-        item.setdefault("ventas_rec_dia", None)
-        item.setdefault("variantes", [])
-        item.setdefault("permalink", item.get("url_catalogo", ""))
+        item["ventas_hist_dia"] = 0.0
         return item
 
     try:
         r = requests.get(url, headers=_HEADERS_WEB, timeout=20, allow_redirects=True)
-        html = r.text
+        ok = _extraer_datos_html(r.text, item)
 
-        # Vendidos
-        m = re.search(r'(\d[\d.]*)\s+vendidos?', html, re.IGNORECASE)
-        vendidos = int(m.group(1).replace(".", "")) if m else 0
+        if not ok:
+            # ML devolvió página de bloqueo — intentar con Playwright
+            html_pw = _scrape_con_playwright_simple(url)
+            _extraer_datos_html(html_pw, item)
 
-        # Stock disponible
-        m = re.search(r'available_quantity[\":\s]+(\d+)', html)
-        stock = int(m.group(1)) if m else None
+    except Exception:
+        pass
 
-        # Marca desde tabla de specs
-        m = re.search(
-            r'>Marca<.*?class="andes-table__column--value"[^>]*>([^<]+)</span>',
-            html, re.DOTALL
-        )
-        marca = (m.group(1).strip() if m else item.get("marca_card", "")) or "Sin marca"
-
-        # Tipo de producto desde domain_id
-        domain_ids = re.findall(r'"domain_id":\s*"([^"]+)"', html)
-        tipo = _limpiar_tipo(domain_ids[0]) if domain_ids else "—"
-
-        # Condición
-        cond_hits = re.findall(r'"condition":\s*"([^"]+)"', html)
-        condicion = cond_hits[0] if cond_hits else "new"
-
-    except Exception as e:
-        vendidos, stock, marca, tipo, condicion = 0, None, item.get("marca_card", "Sin marca"), "—", "new"
-
-    # Actualizar el dict
-    item["vendidos"]       = vendidos
-    item["stock"]          = stock
-    item["marca"]          = marca
-    item["tipo"]           = tipo
-    item["condicion"]      = condicion
-    item["dias_activo"]    = 1         # sin fecha de creación disponible
-    item["ventas_hist_dia"] = vendidos  # usamos total vendidos como proxy del historial
-    item["ventas_rec_dia"]  = None      # se calcula al comparar snapshots
-    item["variantes"]      = []
-    item["permalink"]      = item.get("url_articulo") or item.get("url_catalogo", "")
-
+    item["ventas_hist_dia"] = item["vendidos"]
     return item
 
 
@@ -300,6 +332,67 @@ def enriquecer_items_paralelo(raw_items: list[dict]) -> list[dict]:
                 print(f"      {completados[0]}/{total} ítems procesados…")
 
     return [r for r in resultados if r is not None]
+
+
+# ─── Watchlist ─────────────────────────────────────────────────────────────────
+
+def cargar_watchlist(carpeta: Path) -> list[dict]:
+    """
+    Lee watchlist.txt desde la carpeta del reporte (o el directorio actual).
+    Cada línea puede ser una URL de MercadoLibre o un ID del tipo MLA1234567.
+    Retorna lista de raw_items listos para enriquecer_items_paralelo.
+    """
+    for ruta in [carpeta / "watchlist.txt", Path("watchlist.txt")]:
+        if ruta.exists():
+            break
+    else:
+        return []
+
+    raw = []
+    for linea in ruta.read_text(encoding="utf-8").splitlines():
+        linea = linea.strip()
+        if not linea or linea.startswith("#"):
+            continue
+
+        item_id, url_articulo = "", ""
+
+        # Caso 1: URL de articulo individual  →  articulo.mercadolibre.com.ar/MLA-123
+        m = re.search(r'articulo\.mercadolibre\.com\.ar/(MLA-?\d+)', linea, re.IGNORECASE)
+        if m:
+            item_id = m.group(1).replace("-", "")
+            url_articulo = f"https://articulo.mercadolibre.com.ar/{item_id[:3]}-{item_id[3:]}"
+
+        # Caso 2: solo el ID  →  MLA1234567 o MLA-1234567
+        if not item_id:
+            m = re.match(r'^MLA-?(\d+)$', linea, re.IGNORECASE)
+            if m:
+                item_id = f"MLA{m.group(1)}"
+                url_articulo = f"https://articulo.mercadolibre.com.ar/MLA-{m.group(1)}"
+
+        # Caso 3: cualquier URL de mercadolibre con MLA en el path (catálogo o listado)
+        if not item_id:
+            m = re.search(r'MLA-?(\d{7,})', linea, re.IGNORECASE)
+            if m:
+                item_id = f"MLA{m.group(1)}"
+                url_articulo = f"https://articulo.mercadolibre.com.ar/MLA-{m.group(1)}"
+
+        if not item_id:
+            print(f"      [!] No se pudo extraer ID de: {linea[:80]}")
+            continue
+
+        raw.append({
+            "item_id":      item_id,
+            "titulo":       "",
+            "precio":       0.0,
+            "url_articulo": url_articulo,
+            "url_catalogo": linea,
+            "envio_gratis": False,
+            "marca_card":   "",
+            "sold_card":    "",
+            "origen":       "watchlist",
+        })
+
+    return raw
 
 
 # ─── Snapshot anterior ─────────────────────────────────────────────────────────
@@ -441,12 +534,30 @@ def guardar_excel(
     fecha: datetime,
     carpeta: Path,
     cambios: dict,
+    watchlist_items: list[dict] = None,
 ) -> Path:
     ts   = fecha.strftime("%Y%m%d_%H%M%S")
     ruta = carpeta / f"{nickname}_{ts}.xlsx"
     wb   = openpyxl.Workbook()
 
-    fill_alt = PatternFill("solid", fgColor=GRIS)
+    fill_alt      = PatternFill("solid", fgColor=GRIS)
+    fill_watch    = PatternFill("solid", fgColor="FFF3E0")   # naranja claro para watchlist
+    fill_watch_h  = PatternFill("solid", fgColor="E65100")   # encabezado watchlist
+
+    def _fila_item(ws, r, it, watch=False):
+        stock_str = it["stock"] if it["stock"] is not None else "N/D"
+        fila = [
+            it["item_id"], it["titulo"], it["marca"], it["tipo"],
+            it["precio"], stock_str, it["vendidos"],
+            it["ventas_rec_dia"] if it["ventas_rec_dia"] is not None else "—",
+            it["condicion"], "Sí" if it["envio_gratis"] else "No", it["permalink"],
+        ]
+        for c, val in enumerate(fila, start=1):
+            celda = ws.cell(row=r, column=c, value=val)
+            if watch:
+                celda.fill = fill_watch
+            elif r % 2 == 0:
+                celda.fill = fill_alt
 
     # ── Hoja 1: Publicaciones ──────────────────────────────────────────────────
     ws1 = wb.active
@@ -459,17 +570,15 @@ def guardar_excel(
     _estilo_encabezado(ws1, 1, cols1)
 
     for r, it in enumerate(items, start=2):
-        stock_str = it["stock"] if it["stock"] is not None else "N/D"
-        fila = [
-            it["item_id"], it["titulo"], it["marca"], it["tipo"],
-            it["precio"], stock_str, it["vendidos"],
-            it["ventas_rec_dia"] if it["ventas_rec_dia"] is not None else "—",
-            it["condicion"], "Sí" if it["envio_gratis"] else "No", it["permalink"],
-        ]
-        for c, val in enumerate(fila, start=1):
-            celda = ws1.cell(row=r, column=c, value=val)
-            if r % 2 == 0:
-                celda.fill = fill_alt
+        _fila_item(ws1, r, it)
+
+    # Sección watchlist dentro de la misma hoja (separada por fila en blanco)
+    if watchlist_items:
+        separador = len(items) + 3
+        ws1.cell(row=separador, column=1, value="▼ WATCHLIST — publicaciones vigiladas").font = Font(bold=True, color="E65100")
+        _estilo_encabezado(ws1, separador + 1, cols1, "E65100")
+        for r, it in enumerate(watchlist_items, start=separador + 2):
+            _fila_item(ws1, r, it, watch=True)
 
     ws1.freeze_panes = "A2"
     _autowidth(ws1)
@@ -537,6 +646,7 @@ def generar_html(
     fecha: datetime,
     cambios: dict,
     carpeta: Path,
+    watchlist_items: list[dict] = None,
 ) -> Path:
     ts   = fecha.strftime("%Y%m%d_%H%M%S")
     ruta = carpeta / f"{nickname}_{ts}.html"
@@ -678,6 +788,40 @@ def generar_html(
     </html>
     """)
 
+    # ── Sección watchlist ──────────────────────────────────────────────────────
+    seccion_watch = ""
+    if watchlist_items:
+        filas_watch = ""
+        for it in watchlist_items:
+            rec   = f"{it['ventas_rec_dia']:.2f}" if it["ventas_rec_dia"] is not None else "—"
+            env   = "✅" if it["envio_gratis"] else "❌"
+            stock = it["stock"] if it["stock"] is not None else "N/D"
+            filas_watch += (
+                f"<tr>"
+                f"<td><a href='{it['permalink']}' target='_blank'>{it['titulo'][:65]}</a></td>"
+                f"<td>{it['marca']}</td>"
+                f"<td>{it['tipo']}</td>"
+                f"<td>${it['precio']:,.0f}</td>"
+                f"<td>{stock}</td>"
+                f"<td>{it['vendidos']:,}</td>"
+                f"<td>{rec}</td>"
+                f"<td>{env}</td>"
+                f"</tr>\n"
+            )
+        seccion_watch = f"""
+    <section style="border-top: 3px solid #E65100;">
+      <h2 style="background:#FFF3E0; color:#E65100;">Watchlist — publicaciones vigiladas ({len(watchlist_items)})</h2>
+      <table>
+        <tr style="background:#E65100;">
+          <th>Título</th><th>Marca</th><th>Tipo</th><th>Precio</th>
+          <th>Stock</th><th>Vendidos</th><th>Rec/Día</th><th>Env. Gratis</th>
+        </tr>
+        {filas_watch}
+      </table>
+    </section>"""
+
+    html = html.replace("</body>", seccion_watch + "\n</body>")
+
     ruta.write_text(html, encoding="utf-8")
     print(f"[✓] HTML guardado:  {ruta}")
     return ruta
@@ -769,13 +913,23 @@ def main():
     items = enriquecer_items_paralelo(raw_items)
     print(f"      Listo en {time.time()-t0:.0f}s")
 
-    print("\n[3/5] Cargando reporte anterior para comparar…")
+    print("\n[3/5] Procesando watchlist…")
+    wl_raw = cargar_watchlist(reports_dir)
+    if wl_raw:
+        print(f"      {len(wl_raw)} URLs en watchlist, descargando detalle…")
+        watchlist_items = enriquecer_items_paralelo(wl_raw)
+        print(f"      {len(watchlist_items)} publicaciones de watchlist procesadas.")
+    else:
+        watchlist_items = []
+        print("      watchlist.txt vacío o no encontrado — se omite.")
+
+    print("\n[4/5] Cargando reporte anterior para comparar…")
     anteriores, fecha_ant = cargar_reporte_anterior(nickname, reports_dir)
     cambios = comparar_snapshots(items, anteriores, fecha_ahora, fecha_ant)
 
-    print("\n[4/5] Guardando Excel y HTML…")
-    guardar_excel(items, nickname, fecha_ahora, reports_dir, cambios)
-    generar_html(items, nickname, fecha_ahora, cambios, reports_dir)
+    print("\n[5/5] Guardando Excel y HTML…")
+    guardar_excel(items, nickname, fecha_ahora, reports_dir, cambios, watchlist_items)
+    generar_html(items, nickname, fecha_ahora, cambios, reports_dir, watchlist_items)
 
     total_vendidos = sum(i["vendidos"] for i in items)
     total_stock    = sum((i["stock"] or 0) for i in items)
@@ -792,7 +946,7 @@ def main():
    Eliminadas            : {len(cambios['eliminados'])}
 ─────────────────────────────────────────────────""")
 
-    print("[5/5] Enviando WhatsApp…")
+    print("[6/6] Enviando WhatsApp…")
     enviar_whatsapp(armar_mensaje(nickname, items, cambios, fecha_ahora))
 
     print("\n=== Listo ===\n")
