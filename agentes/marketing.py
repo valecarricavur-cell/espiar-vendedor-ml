@@ -33,14 +33,27 @@ def imprimir_seccion(titulo: str, contenido: str):
     print(contenido.strip())
 
 
+def _leer_identidad() -> str:
+    """Lee agencia.md para usar como contexto de marca."""
+    ruta = Path("agencia.md")
+    if ruta.exists():
+        contenido = ruta.read_text(encoding="utf-8").strip()
+        # Filtrar secciones sin completar (que aún tienen los paréntesis de ejemplo)
+        lineas = [l for l in contenido.splitlines() if not (l.strip().startswith("(") and l.strip().endswith(")"))]
+        return "\n".join(lineas)
+    return ""
+
+
 def generar(tema: str) -> str:
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
         return "⚠️  Falta ANTHROPIC_API_KEY en el archivo .env"
 
     client = anthropic.Anthropic(api_key=api_key)
+    identidad = _leer_identidad()
+    contexto_agencia = f"\n\nIDENTIDAD DE LA AGENCIA:\n{identidad}" if identidad else ""
 
-    prompt = f"""Sos el agente de marketing de AgenciaML, una agencia especializada en e-commerce argentino (MercadoLibre, tiendas online, redes sociales).
+    prompt = f"""Sos el agente de marketing de AgenciaML, una agencia especializada en e-commerce argentino (MercadoLibre, tiendas online, redes sociales).{contexto_agencia}
 
 El dueño de la agencia te pide ayuda con este tema:
 "{tema}"
