@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Impulse Agency — Agencia de E-commerce y Mercado Libre</title>
+<meta name="description" content="Impulse Agency ayuda a vendedores de Mercado Libre y e-commerce propio a escalar sus ventas con estrategia, datos y tecnología.">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --verde:   #1ae82f;
+    --celeste: #22cfff;
+    --negro:   #080808;
+    --gris1:   #111111;
+    --gris2:   #1a1a1a;
+    --gris3:   #242424;
+    --gris4:   #333333;
+    --blanco:  #f0f0f0;
+    --texto:   #aaaaaa;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--negro);
+    color: var(--blanco);
+    min-height: 100vh;
+  }
+
+  a { color: inherit; text-decoration: none; }
+
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+
+  /* ── HEADER ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--gris3);
+    background: rgba(8,8,8,0.85);
+    backdrop-filter: blur(8px);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    max-width: 1120px;
+    margin: 0 auto;
+  }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo img { width: 34px; height: 34px; border-radius: 8px; }
+  .logo-text { font-size: 16px; font-weight: 800; letter-spacing: 0.04em; }
+  .logo-sub { font-size: 10px; color: var(--texto); font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; }
+
+  nav { display: flex; align-items: center; gap: 32px; }
+  nav a.navlink { font-size: 14px; color: var(--texto); font-weight: 500; transition: color 0.2s; }
+  nav a.navlink:hover { color: var(--blanco); }
+
+  .btn {
+    display: inline-block;
+    padding: 11px 22px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .btn-primary { background: var(--verde); color: #06120a; box-shadow: 0 0 0 rgba(26,232,47,0); }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(26,232,47,0.25); }
+  .btn-outline { border: 1px solid var(--gris4); color: var(--blanco); }
+  .btn-outline:hover { border-color: var(--celeste); color: var(--celeste); }
+
+  @media (max-width: 720px) {
+    nav .navlink { display: none; }
+  }
+
+  /* ── HERO ── */
+  .hero {
+    padding: 96px 24px 80px;
+    text-align: center;
+    border-bottom: 1px solid var(--gris3);
+    background:
+      radial-gradient(600px 300px at 20% 0%, rgba(26,232,47,0.08), transparent),
+      radial-gradient(600px 300px at 80% 10%, rgba(34,207,255,0.07), transparent);
+  }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 14px; border-radius: 100px;
+    background: rgba(26,232,47,0.1); border: 1px solid rgba(26,232,47,0.25);
+    color: var(--verde); font-size: 12px; font-weight: 700;
+    letter-spacing: 0.04em; text-transform: uppercase;
+    margin-bottom: 28px;
+  }
+  .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--verde); box-shadow: 0 0 8px var(--verde); }
+  .hero h1 {
+    font-size: 48px; font-weight: 800; line-height: 1.15; letter-spacing: -0.02em;
+    max-width: 780px; margin: 0 auto 20px;
+  }
+  .hero h1 span { color: var(--verde); }
+  .hero p {
+    font-size: 17px; color: var(--texto); max-width: 560px; margin: 0 auto 36px; line-height: 1.6;
+  }
+  .hero-ctas { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+
+  @media (max-width: 600px) {
+    .hero h1 { font-size: 32px; }
+  }
+
+  /* ── SECTION SHARED ── */
+  section { padding: 88px 24px; border-bottom: 1px solid var(--gris3); }
+  .eyebrow {
+    font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--celeste); margin-bottom: 12px; text-align: center;
+  }
+  .section-title {
+    font-size: 32px; font-weight: 800; text-align: center; letter-spacing: -0.01em;
+    max-width: 620px; margin: 0 auto 16px;
+  }
+  .section-sub {
+    font-size: 15px; color: var(--texto); text-align: center; max-width: 560px; margin: 0 auto 56px; line-height: 1.6;
+  }
+
+  /* ── SERVICIOS ── */
+  .grid-servicios {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+    max-width: 1120px; margin: 0 auto;
+  }
+  @media (max-width: 900px) { .grid-servicios { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px) { .grid-servicios { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--gris1);
+    border: 1px solid var(--gris3);
+    border-radius: 14px;
+    padding: 28px 24px;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .card:hover { border-color: var(--gris4); transform: translateY(-3px); }
+  .card-icon {
+    width: 40px; height: 40px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(26,232,47,0.1); color: var(--verde);
+    font-weight: 800; font-size: 16px; margin-bottom: 18px;
+  }
+  .card h3 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+  .card p { font-size: 13.5px; color: var(--texto); line-height: 1.6; }
+
+  /* ── NOSOTROS ── */
+  .nosotros {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center;
+    max-width: 1120px; margin: 0 auto;
+  }
+  @media (max-width: 800px) { .nosotros { grid-template-columns: 1fr; } }
+  .nosotros h2 { font-size: 28px; font-weight: 800; margin-bottom: 20px; letter-spacing: -0.01em; }
+  .nosotros p { color: var(--texto); font-size: 15px; line-height: 1.75; margin-bottom: 16px; }
+  .pilares { display: flex; flex-direction: column; gap: 18px; }
+  .pilar { display: flex; gap: 14px; align-items: flex-start; }
+  .pilar-num {
+    width: 32px; height: 32px; flex-shrink: 0; border-radius: 8px;
+    background: var(--gris2); border: 1px solid var(--gris3);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--celeste); font-weight: 800; font-size: 13px;
+  }
+  .pilar h4 { font-size: 14.5px; font-weight: 700; margin-bottom: 4px; }
+  .pilar p { font-size: 13px; color: var(--texto); line-height: 1.5; }
+
+  /* ── PROCESO ── */
+  .proceso-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;
+    max-width: 1120px; margin: 0 auto;
+  }
+  @media (max-width: 900px) { .proceso-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 500px) { .proceso-grid { grid-template-columns: 1fr; } }
+  .paso { position: relative; padding: 24px 20px; background: var(--gris1); border: 1px solid var(--gris3); border-radius: 14px; }
+  .paso-num {
+    font-size: 32px; font-weight: 800; color: var(--gris4); margin-bottom: 14px; line-height: 1;
+  }
+  .paso h3 { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+  .paso p { font-size: 13px; color: var(--texto); line-height: 1.6; }
+
+  /* ── RESULTADOS / TESTIMONIO ── */
+  .testimonio {
+    max-width: 720px; margin: 0 auto;
+    background: var(--gris1); border: 1px solid var(--gris3); border-radius: 16px;
+    padding: 44px 40px; text-align: center;
+    position: relative;
+  }
+  .testimonio-quote-mark { font-size: 48px; color: var(--verde); line-height: 1; font-weight: 800; margin-bottom: 8px; }
+  .testimonio p.quote { font-size: 19px; font-weight: 500; line-height: 1.6; margin-bottom: 26px; }
+  .testimonio-autor { display: flex; align-items: center; justify-content: center; gap: 12px; }
+  .avatar-fake {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--verde), var(--celeste));
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; color: #06120a; font-size: 14px;
+  }
+  .testimonio-autor .info { text-align: left; }
+  .testimonio-autor .nombre { font-size: 14px; font-weight: 700; }
+  .testimonio-autor .rol { font-size: 12px; color: var(--texto); }
+
+  .stat-highlight {
+    display: inline-flex; align-items: baseline; gap: 6px;
+    margin-top: 26px; padding-top: 26px; border-top: 1px solid var(--gris3);
+    width: 100%; justify-content: center;
+  }
+  .stat-highlight .num { font-size: 30px; font-weight: 800; color: var(--verde); }
+  .stat-highlight .label { font-size: 13px; color: var(--texto); }
+
+  /* ── CONTACTO ── */
+  .contacto { text-align: center; border-bottom: none; }
+  .contacto-canales {
+    display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-top: 40px;
+  }
+  .canal {
+    display: flex; align-items: center; gap: 12px;
+    padding: 16px 22px; background: var(--gris1); border: 1px solid var(--gris3); border-radius: 12px;
+    min-width: 220px; text-align: left; transition: border-color 0.2s, transform 0.2s;
+  }
+  .canal:hover { border-color: var(--celeste); transform: translateY(-2px); }
+  .canal-icon {
+    width: 38px; height: 38px; border-radius: 9px; flex-shrink: 0;
+    background: rgba(34,207,255,0.1); color: var(--celeste);
+    display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px;
+  }
+  .canal .canal-label { font-size: 11px; color: var(--texto); text-transform: uppercase; letter-spacing: 0.06em; }
+  .canal .canal-valor { font-size: 14px; font-weight: 700; }
+
+  /* ── FOOTER ── */
+  footer {
+    padding: 32px 24px; text-align: center;
+    font-size: 12.5px; color: var(--texto);
+  }
+  footer .foot-brand { color: var(--blanco); font-weight: 700; }
+</style>
+</head>
+<body>
+
+  <header>
+    <div class="logo">
+      <img src="assets/impulse_logo.png" alt="Impulse Agency">
+      <div>
+        <div class="logo-text">IMPULSE AGENCY</div>
+        <div class="logo-sub">E-commerce &amp; Mercado Libre</div>
+      </div>
+    </div>
+    <nav>
+      <a class="navlink" href="#servicios">Servicios</a>
+      <a class="navlink" href="#nosotros">Nosotros</a>
+      <a class="navlink" href="#proceso">Proceso</a>
+      <a class="navlink" href="#resultados">Resultados</a>
+      <a class="btn btn-primary" href="https://wa.me/5492914656671" target="_blank" rel="noopener">Hablemos</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <div class="badge"><span class="badge-dot"></span>Agencia de performance en e-commerce</div>
+    <h1>Escalamos tu negocio en <span>Mercado Libre</span> y e-commerce propio con datos y estrategia</h1>
+    <p>Auditamos, optimizamos y gestionamos cuentas para vender más sin adivinar. Menos vendehumismo, más números.</p>
+    <div class="hero-ctas">
+      <a class="btn btn-primary" href="https://wa.me/5492914656671" target="_blank" rel="noopener">Hablar por WhatsApp</a>
+      <a class="btn btn-outline" href="#servicios">Ver servicios</a>
+    </div>
+  </section>
+
+  <section id="servicios">
+    <div class="eyebrow">Qué hacemos</div>
+    <h2 class="section-title">Servicios</h2>
+    <p class="section-sub">Trabajamos sobre dos frentes: tu cuenta de Mercado Libre y tu ecosistema digital propio.</p>
+    <div class="grid-servicios">
+      <div class="card">
+        <div class="card-icon">ML</div>
+        <h3>Auditoría de cuenta Mercado Libre</h3>
+        <p>Diagnóstico completo de publicaciones, precios, reputación y riesgo de quiebre de stock, con plan de acción priorizado.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">$</div>
+        <h3>Product Ads &amp; performance</h3>
+        <p>Gestión y optimización de campañas con foco en ACOS y ROAS reales, no en vanity metrics.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">↑</div>
+        <h3>Optimización de fichas y catálogo</h3>
+        <p>Mejora de conversión con SEO de producto, imágenes y estructura de precios pensada para el algoritmo de Meli.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">◆</div>
+        <h3>E-commerce propio</h3>
+        <p>Tienda, conversión y análisis semanal con herramientas propias para vender fuera de Meli sin depender solo de una plataforma.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">▲</div>
+        <h3>Meta Ads &amp; tráfico</h3>
+        <p>Campañas de adquisición para traer tráfico calificado a tienda propia y redes.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">⚙</div>
+        <h3>Automatización &amp; dashboards</h3>
+        <p>Paneles y reportes a medida para tomar decisiones con datos actualizados, no con corazonadas.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="nosotros">
+    <div class="nosotros">
+      <div>
+        <h2>Quiénes somos</h2>
+        <p>Impulse Agency es una agencia de e-commerce enfocada en vendedores de Mercado Libre y marcas que quieren profesionalizar su venta directa.</p>
+        <p>Trabajamos con datos duros, tecnología propia y seguimiento cercano en cada cuenta. Nada de promesas mágicas: cada estrategia se mide contra números concretos, cuenta por cuenta.</p>
+      </div>
+      <div class="pilares">
+        <div class="pilar">
+          <div class="pilar-num">01</div>
+          <div>
+            <h4>Enfoque en datos</h4>
+            <p>Cada decisión se apoya en métricas: ACOS, ROAS, conversión, reputación.</p>
+          </div>
+        </div>
+        <div class="pilar">
+          <div class="pilar-num">02</div>
+          <div>
+            <h4>Tecnología propia</h4>
+            <p>Dashboards y herramientas de análisis desarrolladas a medida para cada cliente.</p>
+          </div>
+        </div>
+        <div class="pilar">
+          <div class="pilar-num">03</div>
+          <div>
+            <h4>Seguimiento cercano</h4>
+            <p>Optimización semanal, no un informe mensual que nadie lee.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="proceso">
+    <div class="eyebrow">Cómo trabajamos</div>
+    <h2 class="section-title">Proceso</h2>
+    <p class="section-sub">Un método claro, de diagnóstico a resultado medible.</p>
+    <div class="proceso-grid">
+      <div class="paso">
+        <div class="paso-num">01</div>
+        <h3>Diagnóstico</h3>
+        <p>Auditamos la cuenta y detectamos qué frena las ventas hoy.</p>
+      </div>
+      <div class="paso">
+        <div class="paso-num">02</div>
+        <h3>Estrategia</h3>
+        <p>Definimos un plan priorizado según impacto y esfuerzo.</p>
+      </div>
+      <div class="paso">
+        <div class="paso-num">03</div>
+        <h3>Implementación</h3>
+        <p>Ejecutamos cambios en fichas, ads y catálogo.</p>
+      </div>
+      <div class="paso">
+        <div class="paso-num">04</div>
+        <h3>Seguimiento</h3>
+        <p>Medimos semana a semana y ajustamos con datos reales.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="resultados">
+    <div class="eyebrow">Resultados</div>
+    <h2 class="section-title">Lo que dicen nuestros clientes</h2>
+    <div class="testimonio">
+      <div class="testimonio-quote-mark">&ldquo;</div>
+      <p class="quote">Pasamos de vender 5 unidades por día a vender 25 unidades por día en el lapso de 4 a 6 semanas con una buena estrategia.</p>
+      <div class="testimonio-autor">
+        <div class="avatar-fake">FT</div>
+        <div class="info">
+          <div class="nombre">Futura Tech</div>
+          <div class="rol">Cliente Impulse Agency</div>
+        </div>
+      </div>
+      <div class="stat-highlight">
+        <span class="num">5x</span>
+        <span class="label">más unidades vendidas por día, en 4 a 6 semanas</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="contacto" class="contacto">
+    <div class="eyebrow">Contacto</div>
+    <h2 class="section-title">Hablemos de tu cuenta</h2>
+    <p class="section-sub">Contanos en qué etapa está tu negocio y te decimos qué podemos mejorar.</p>
+    <div class="contacto-canales">
+      <a class="canal" href="https://wa.me/5492914656671" target="_blank" rel="noopener">
+        <div class="canal-icon">W</div>
+        <div>
+          <div class="canal-label">WhatsApp</div>
+          <div class="canal-valor">+54 291 465-6671</div>
+        </div>
+      </a>
+      <a class="canal" href="mailto:valecarricavur@gmail.com">
+        <div class="canal-icon">@</div>
+        <div>
+          <div class="canal-label">Email</div>
+          <div class="canal-valor">valecarricavur@gmail.com</div>
+        </div>
+      </a>
+      <a class="canal" href="https://instagram.com/valen.carricavur" target="_blank" rel="noopener">
+        <div class="canal-icon">IG</div>
+        <div>
+          <div class="canal-label">Instagram</div>
+          <div class="canal-valor">@valen.carricavur</div>
+        </div>
+      </a>
+    </div>
+  </section>
+
+  <footer>
+    <span class="foot-brand">Impulse Agency</span> — E-commerce &amp; Mercado Libre · © 2026
+  </footer>
+
+</body>
+</html>
