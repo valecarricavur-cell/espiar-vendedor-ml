@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Impulse Agency — Dashboard Operativo</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --verde:   #1ae82f;
+    --celeste: #22cfff;
+    --negro:   #080808;
+    --gris1:   #111111;
+    --gris2:   #1a1a1a;
+    --gris3:   #242424;
+    --gris4:   #333333;
+    --blanco:  #f0f0f0;
+    --texto:   #aaaaaa;
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--negro);
+    color: var(--blanco);
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 40px;
+    border-bottom: 1px solid var(--gris3);
+    background: var(--gris1);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .logo-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--verde);
+    box-shadow: 0 0 10px var(--verde);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .logo-text { font-size: 16px; font-weight: 700; letter-spacing: 0.05em; }
+  .logo-sub  { font-size: 11px; color: var(--texto); font-weight: 400; letter-spacing: 0.12em; text-transform: uppercase; }
+  .header-right { display: flex; align-items: center; gap: 24px; }
+  .fecha { font-size: 12px; color: var(--texto); }
+  .badge-live {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+    background: rgba(26,232,47,0.12); color: var(--verde);
+    border: 1px solid rgba(26,232,47,0.3);
+    padding: 4px 10px; border-radius: 20px; text-transform: uppercase;
+  }
+
+  /* ── LAYOUT ── */
+  main { padding: 32px 40px; max-width: 1400px; margin: 0 auto; }
+
+  .section-title {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.15em;
+    text-transform: uppercase; color: var(--texto);
+    margin-bottom: 16px; margin-top: 36px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .section-title::after {
+    content: ''; flex: 1; height: 1px; background: var(--gris3);
+  }
+
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--gris1);
+    border: 1px solid var(--gris3);
+    border-radius: 12px;
+    padding: 24px;
+    transition: border-color 0.2s;
+  }
+  .card:hover { border-color: var(--gris4); }
+  .card.verde  { border-top: 2px solid var(--verde); }
+  .card.celeste { border-top: 2px solid var(--celeste); }
+  .card.neutral { border-top: 2px solid var(--gris4); }
+
+  .card-label {
+    font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--texto); margin-bottom: 10px;
+  }
+  .card-value {
+    font-size: 36px; font-weight: 800; line-height: 1;
+    margin-bottom: 6px;
+  }
+  .card-value.verde   { color: var(--verde); }
+  .card-value.celeste { color: var(--celeste); }
+  .card-value.blanco  { color: var(--blanco); }
+  .card-sub { font-size: 12px; color: var(--texto); }
+
+  .delta {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; font-weight: 600; margin-top: 8px;
+    padding: 3px 8px; border-radius: 4px;
+  }
+  .delta.up   { color: var(--verde);   background: rgba(26,232,47,0.1); }
+  .delta.down { color: #ff4444;        background: rgba(255,68,68,0.1); }
+  .delta.flat { color: var(--celeste); background: rgba(34,207,255,0.1); }
+
+  /* ── ADS CARD ── */
+  .ads-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 0; border-bottom: 1px solid var(--gris3);
+  }
+  .ads-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .ads-name { font-size: 13px; font-weight: 500; margin-bottom: 3px; }
+  .ads-meta { font-size: 11px; color: var(--texto); }
+  .ads-stat { text-align: right; }
+  .ads-stat-val { font-size: 16px; font-weight: 700; }
+  .ads-stat-val.verde { color: var(--verde); }
+  .ads-stat-val.celeste { color: var(--celeste); }
+  .ads-stat-label { font-size: 10px; color: var(--texto); }
+
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px;
+  }
+  .status-dot.activo  { background: var(--verde);   box-shadow: 0 0 6px var(--verde); }
+  .status-dot.pendiente { background: #f5a623; box-shadow: 0 0 6px #f5a623; }
+  .status-dot.pausado { background: #555; }
+
+  /* ── LISTA DE CONTENIDO ── */
+  .content-list { list-style: none; }
+  .content-item {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    padding: 10px 0; border-bottom: 1px solid var(--gris3); gap: 12px;
+  }
+  .content-item:last-child { border-bottom: none; }
+  .content-item-title { font-size: 13px; font-weight: 500; margin-bottom: 3px; line-height: 1.3; }
+  .content-item-meta  { font-size: 11px; color: var(--texto); }
+  .tag {
+    font-size: 10px; font-weight: 600; letter-spacing: 0.05em;
+    padding: 3px 8px; border-radius: 4px; white-space: nowrap; flex-shrink: 0;
+    text-transform: uppercase;
+  }
+  .tag.reel     { background: rgba(34,207,255,0.12); color: var(--celeste); border: 1px solid rgba(34,207,255,0.25); }
+  .tag.carrusel { background: rgba(26,232,47,0.12);  color: var(--verde);   border: 1px solid rgba(26,232,47,0.25); }
+  .tag.listo    { background: rgba(26,232,47,0.12);  color: var(--verde);   border: 1px solid rgba(26,232,47,0.25); }
+  .tag.grabado  { background: rgba(34,207,255,0.12); color: var(--celeste); border: 1px solid rgba(34,207,255,0.25); }
+  .tag.pendiente { background: rgba(245,166,35,0.12); color: #f5a623; border: 1px solid rgba(245,166,35,0.25); }
+
+  /* ── COMPETENCIA ── */
+  .comp-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 0; border-bottom: 1px solid var(--gris3);
+  }
+  .comp-row:last-child { border-bottom: none; }
+  .comp-label { font-size: 12px; color: var(--texto); }
+  .comp-val   { font-size: 13px; font-weight: 600; }
+
+  /* ── ACCESOS RÁPIDOS ── */
+  .btn {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--gris2); border: 1px solid var(--gris3);
+    color: var(--blanco); padding: 14px 18px; border-radius: 10px;
+    cursor: pointer; font-size: 13px; font-weight: 500;
+    font-family: 'Inter', sans-serif;
+    transition: all 0.2s; text-decoration: none; width: 100%;
+  }
+  .btn:hover { background: var(--gris3); border-color: var(--gris4); }
+  .btn-icon { font-size: 18px; }
+  .btn-text { flex: 1; }
+  .btn-sub  { font-size: 10px; color: var(--texto); margin-top: 2px; }
+  .btn.verde-accent { border-color: rgba(26,232,47,0.3); }
+  .btn.verde-accent:hover { border-color: var(--verde); }
+  .btn.celeste-accent { border-color: rgba(34,207,255,0.3); }
+  .btn.celeste-accent:hover { border-color: var(--celeste); }
+
+  /* ── TAREAS ── */
+  .task-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 0; border-bottom: 1px solid var(--gris3);
+  }
+  .task-item:last-child { border-bottom: none; }
+  .task-check {
+    width: 18px; height: 18px; border-radius: 50%;
+    border: 2px solid var(--gris4); flex-shrink: 0; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+  }
+  .task-check.done { background: var(--verde); border-color: var(--verde); }
+  .task-check.done::after { content: '✓'; font-size: 10px; color: #000; font-weight: 700; }
+  .task-text { font-size: 13px; }
+  .task-text.done-text { text-decoration: line-through; color: var(--texto); }
+  .task-date { font-size: 11px; color: var(--texto); margin-left: auto; white-space: nowrap; }
+
+  /* ── REDES CARD ── */
+  .red-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 11px 0; border-bottom: 1px solid var(--gris3);
+  }
+  .red-row:last-child { border-bottom: none; }
+  .red-name { font-size: 13px; font-weight: 500; }
+  .red-val  { font-size: 15px; font-weight: 700; }
+
+  /* ── FOOTER ── */
+  footer {
+    text-align: center; padding: 32px 40px;
+    font-size: 11px; color: var(--gris4);
+    border-top: 1px solid var(--gris3); margin-top: 48px;
+  }
+
+  @media (max-width: 900px) {
+    .grid-3, .grid-4 { grid-template-columns: 1fr 1fr; }
+    .grid-2 { grid-template-columns: 1fr; }
+    main { padding: 20px; }
+    header { padding: 16px 20px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    <div>
+      <div class="logo-text">IMPULSE AGENCY</div>
+      <div class="logo-sub">Dashboard Operativo</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="fecha" id="fecha-hoy"></div>
+    <div class="badge-live">● Live</div>
+  </div>
+</header>
+
+<main>
+
+  <!-- KPIs -->
+  <div class="section-title">Resumen general</div>
+  <div class="grid-4">
+
+    <div class="card verde">
+      <div class="card-label">Seguidores Instagram</div>
+      <div class="card-value verde">388</div>
+      <div class="card-sub">Ratio en normalización</div>
+      <div class="delta down">↓ 1.500 seguidos → depurando</div>
+    </div>
+
+    <div class="card celeste">
+      <div class="card-label">Alcance ads (total)</div>
+      <div class="card-value celeste">20.600</div>
+      <div class="card-sub">Campaña anterior validada</div>
+      <div class="delta up">↑ 2 nuevas campañas mañana</div>
+    </div>
+
+    <div class="card neutral">
+      <div class="card-label">Guiones generados</div>
+      <div class="card-value blanco">8</div>
+      <div class="card-sub">Listos para grabar</div>
+      <div class="delta flat">→ 2 se graban hoy</div>
+    </div>
+
+    <div class="card neutral">
+      <div class="card-label">Carruseles publicados</div>
+      <div class="card-value blanco">9</div>
+      <div class="card-sub">TikTok + Instagram</div>
+      <div class="delta up">↑ Saves altos en "convierte vs quema"</div>
+    </div>
+
+  </div>
+
+  <!-- ADS -->
+  <div class="section-title">Ads activos</div>
+  <div class="grid-2">
+
+    <div class="card">
+      <div class="card-label">Campañas Meta Ads</div>
+      <div class="content-list">
+
+        <div class="ads-row">
+          <div>
+            <div class="ads-name"><span class="status-dot pendiente"></span>Carrusel — Convierten vs Queman</div>
+            <div class="ads-meta">Objetivo: Alcance · $10 USD/día · 5-7 días</div>
+          </div>
+          <div class="ads-stat">
+            <div class="ads-stat-val verde">Mañana</div>
+            <div class="ads-stat-label">Inicio programado</div>
+          </div>
+        </div>
+
+        <div class="ads-row">
+          <div>
+            <div class="ads-name"><span class="status-dot pendiente"></span>Reel — ROAS 1.2 a 4.1</div>
+            <div class="ads-meta">Objetivo: Tráfico / Mensajes · $10 USD/día · 5-7 días</div>
+          </div>
+          <div class="ads-stat">
+            <div class="ads-stat-val verde">Mañana</div>
+            <div class="ads-stat-label">Inicio programado</div>
+          </div>
+        </div>
+
+        <div class="ads-row">
+          <div>
+            <div class="ads-name"><span class="status-dot pausado"></span>Campaña anterior</div>
+            <div class="ads-meta">Alcance logrado: 20.600 personas · Argentina</div>
+          </div>
+          <div class="ads-stat">
+            <div class="ads-stat-val" style="color:var(--texto)">Pausada</div>
+            <div class="ads-stat-label">Audiencia validada ✓</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Métricas a revisar (48hs post-publicación)</div>
+      <div class="comp-row"><span class="comp-label">CTR objetivo (Reel ROAS)</span><span class="comp-val" style="color:var(--verde)">> 1.5%</span></div>
+      <div class="comp-row"><span class="comp-label">CPM referencia</span><span class="comp-val">$2–5 USD</span></div>
+      <div class="comp-row"><span class="comp-label">Saves mínimos (Carrusel)</span><span class="comp-val" style="color:var(--verde)">> 10</span></div>
+      <div class="comp-row"><span class="comp-label">Presupuesto total test</span><span class="comp-val" style="color:var(--celeste)">$100–140 USD</span></div>
+      <div class="comp-row"><span class="comp-label">Audiencia</span><span class="comp-val">ARG · 28–45 · E-commerce</span></div>
+    </div>
+
+  </div>
+
+  <!-- CONTENIDO -->
+  <div class="section-title">Contenido — Guiones</div>
+  <div class="grid-2">
+
+    <div class="card">
+      <div class="card-label">Listos para grabar</div>
+      <ul class="content-list">
+        <li class="content-item">
+          <div>
+            <div class="content-item-title">Lo que separa al seller de $100K del de $1M</div>
+            <div class="content-item-meta">29 may · Hook: datos vs intuición · 72 seg</div>
+          </div>
+          <span class="tag pendiente">Hoy</span>
+        </li>
+        <li class="content-item">
+          <div>
+            <div class="content-item-title">Mi setup de trabajo como consultor (sin humo)</div>
+            <div class="content-item-meta">30 may · Setup real + pantallas · 70 seg</div>
+          </div>
+          <span class="tag pendiente">Hoy</span>
+        </li>
+        <li class="content-item">
+          <div>
+            <div class="content-item-title">El branding puro es la trampa más cara</div>
+            <div class="content-item-meta">28 may · Creencia rota → reencuadre · 68 seg</div>
+          </div>
+          <span class="tag listo">Listo</span>
+        </li>
+        <li class="content-item">
+          <div>
+            <div class="content-item-title">De ROAS 1.2 a 4.1 en 30 días</div>
+            <div class="content-item-meta">27 may · Caso real · Alto en saves TikTok</div>
+          </div>
+          <span class="tag grabado">Publicado</span>
+        </li>
+        <li class="content-item">
+          <div>
+            <div class="content-item-title">Cuando tu meta anuncio no convierte</div>
+            <div class="content-item-meta">24 may · Diagnóstico paso a paso</div>
+          </div>
+          <span class="tag listo">Listo</span>
+        </li>
+        <li class="content-item">
+          <div>
+            <div class="content-item-title">La IA llegó a MercadoLibre</div>
+            <div class="content-item-meta">26 may · Tendencia · Urgencia</div>
+          </div>
+          <span class="tag listo">Listo</span>
+        </li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Carruseles generados</div>
+      <ul class="content-list">
+        <li class="content-item">
+          <div>
+            <div class="content-item-title">Campañas Meta que convierten vs que queman</div>
+            <div class="content-item-meta">Saves altos TikTok + Instagram · Para pautar</div>
+          </div>
+          <span class="tag carrusel">⭐ Pautar</span>
+        </li>
+        <li class="content-item">
+          <div>
+            <div class="content-item-title">Por qué tu tienda online no vende</div>
+            <div class="content-item-meta">Publicado hoy · En análisis</div>
+          </div>
+          <span class="tag grabado">Live</span>
+        </li>
+        <li class="content-item">
+          <div>
+            <div class="content-item-title">5 métricas antes de pautar</div>
+            <div class="content-item-meta">24 may · Educativo · Alto valor</div>
+          </div>
+          <span class="tag carrusel">Carrusel</span>
+        </li>
+        <li class="content-item">
+          <div>
+            <div class="content-item-title">Meli vs tienda propia — cuándo hacer el salto</div>
+            <div class="content-item-meta">24 may · Decisión estratégica</div>
+          </div>
+          <span class="tag carrusel">Carrusel</span>
+        </li>
+        <li class="content-item">
+          <div>
+            <div class="content-item-title">Error que le cuesta el 40% de sus ventas</div>
+            <div class="content-item-meta">24 may · Pain directo</div>
+          </div>
+          <span class="tag carrusel">Carrusel</span>
+        </li>
+        <li class="content-item">
+          <div>
+            <div class="content-item-title">Por qué vendés mucho y ganás poco</div>
+            <div class="content-item-meta">3 may · Márgenes · Muy relevante</div>
+          </div>
+          <span class="tag carrusel">Carrusel</span>
+        </li>
+      </ul>
+    </div>
+
+  </div>
+
+  <!-- COMPETENCIA + REDES -->
+  <div class="section-title">Análisis de competencia · Redes sociales</div>
+  <div class="grid-3">
+
+    <div class="card">
+      <div class="card-label">Competencia analizada — TODOAIRELIBRE</div>
+      <div class="comp-row"><span class="comp-label">Último reporte</span><span class="comp-val">17 may 2026</span></div>
+      <div class="comp-row"><span class="comp-label">Plataforma</span><span class="comp-val">MercadoLibre</span></div>
+      <div class="comp-row"><span class="comp-label">Reportes totales</span><span class="comp-val" style="color:var(--celeste)">3 análisis</span></div>
+      <div class="comp-row"><span class="comp-label">Herramienta</span><span class="comp-val">Espía IA nativo</span></div>
+      <div class="comp-row"><span class="comp-label">Estado</span><span class="comp-val" style="color:var(--verde)">✓ Activo</span></div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Instagram · Impulse Agency</div>
+      <div class="red-row"><span class="red-name">Seguidores</span><span class="red-val" style="color:var(--verde)">388</span></div>
+      <div class="red-row"><span class="red-name">Seguidos</span><span class="red-val" style="color:#f5a623">1.500</span></div>
+      <div class="red-row"><span class="red-name">Ratio objetivo</span><span class="red-val">Seg &gt; Seguidos</span></div>
+      <div class="red-row"><span class="red-name">Plan</span><span class="red-val" style="color:var(--celeste)">−50/día max</span></div>
+      <div class="red-row"><span class="red-name">Frec. publicación</span><span class="red-val">1 reel + 1 carrusel/día</span></div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">TikTok · Señales orgánicas</div>
+      <div class="red-row"><span class="red-name">Carrusel con más saves</span><span class="red-val" style="color:var(--verde)">Convierten vs Queman</span></div>
+      <div class="red-row"><span class="red-name">Reel con más views</span><span class="red-val" style="color:var(--celeste)">ROAS 1.2 → 4.1</span></div>
+      <div class="red-row"><span class="red-name">Formato que mejor funciona</span><span class="red-val">Carrusel educativo</span></div>
+      <div class="red-row"><span class="red-name">Validación para ads</span><span class="red-val" style="color:var(--verde)">✓ Ambos confirmados</span></div>
+    </div>
+
+  </div>
+
+  <!-- TAREAS + ACCESOS -->
+  <div class="section-title">Próximas acciones · Accesos rápidos</div>
+  <div class="grid-2">
+
+    <div class="card">
+      <div class="card-label">Tareas esta semana</div>
+
+      <div class="task-item">
+        <div class="task-check done" onclick="toggleTask(this)"></div>
+        <div class="task-text done-text">Publicar carrusel "Tienda online no vende"</div>
+        <div class="task-date">Hoy</div>
+      </div>
+      <div class="task-item">
+        <div class="task-check" onclick="toggleTask(this)"></div>
+        <div class="task-text">Grabar reel $100K vs $1M</div>
+        <div class="task-date">Hoy</div>
+      </div>
+      <div class="task-item">
+        <div class="task-check" onclick="toggleTask(this)"></div>
+        <div class="task-text">Grabar reel Setup consultor sin humo (con pantallas)</div>
+        <div class="task-date">Hoy</div>
+      </div>
+      <div class="task-item">
+        <div class="task-check" onclick="toggleTask(this)"></div>
+        <div class="task-text">Activar ads en Meta — Carrusel (alcance) + Reel ROAS (mensajes)</div>
+        <div class="task-date">Mañana</div>
+      </div>
+      <div class="task-item">
+        <div class="task-check" onclick="toggleTask(this)"></div>
+        <div class="task-text">Revisar CTR y saves a las 48hs de los ads</div>
+        <div class="task-date">+2 días</div>
+      </div>
+      <div class="task-item">
+        <div class="task-check" onclick="toggleTask(this)"></div>
+        <div class="task-text">Depurar seguidos — máx 50/día</div>
+        <div class="task-date">Esta semana</div>
+      </div>
+      <div class="task-item">
+        <div class="task-check" onclick="toggleTask(this)"></div>
+        <div class="task-text">Organizar calendario contenido semana siguiente (domingo)</div>
+        <div class="task-date">Domingo</div>
+      </div>
+
+    </div>
+
+    <div class="card">
+      <div class="card-label">Herramientas</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+
+        <button class="btn verde-accent" onclick="runEspia()">
+          <span class="btn-icon">🔍</span>
+          <div class="btn-text">
+            <div>Correr Espía MercadoLibre</div>
+            <div class="btn-sub">python3 espiar_vendedor.py [nickname]</div>
+          </div>
+        </button>
+
+        <button class="btn celeste-accent" onclick="runWebAnalyzer()">
+          <span class="btn-icon">🌐</span>
+          <div class="btn-text">
+            <div>Analizar sitio web</div>
+            <div class="btn-sub">python3 agentes/web.py [URL]</div>
+          </div>
+        </button>
+
+        <button class="btn verde-accent" onclick="runCarrusel()">
+          <span class="btn-icon">📱</span>
+          <div class="btn-text">
+            <div>Generar carrusel</div>
+            <div class="btn-sub">python3 agentes/carrusel_imagenes.py "[tema]"</div>
+          </div>
+        </button>
+
+        <a class="btn" href="https://adsmanager.facebook.com" target="_blank">
+          <span class="btn-icon">📊</span>
+          <div class="btn-text">
+            <div>Meta Ads Manager</div>
+            <div class="btn-sub">Revisar CTR · ROAS · CPM</div>
+          </div>
+        </a>
+
+        <a class="btn" href="https://www.mercadolibre.com.ar" target="_blank">
+          <span class="btn-icon">🛍️</span>
+          <div class="btn-text">
+            <div>MercadoLibre Argentina</div>
+            <div class="btn-sub">Verificar competencia manualmente</div>
+          </div>
+        </a>
+
+      </div>
+    </div>
+
+  </div>
+
+</main>
+
+<footer>
+  IMPULSE AGENCY · Dashboard Operativo · Uso interno · Construido con Claude Code
+</footer>
+
+<script>
+  // Fecha actual
+  const d = new Date();
+  const opciones = { weekday:'long', year:'numeric', month:'long', day:'numeric' };
+  document.getElementById('fecha-hoy').textContent = d.toLocaleDateString('es-AR', opciones);
+
+  // Toggle tareas
+  function toggleTask(el) {
+    el.classList.toggle('done');
+    const txt = el.nextElementSibling;
+    txt.classList.toggle('done-text');
+  }
+
+  // Botones herramientas — muestran el comando a correr
+  function runEspia() {
+    const nick = prompt('Nickname del vendedor en MercadoLibre:');
+    if (nick) {
+      alert(`Corré en terminal:\n\npython3 espiar_vendedor.py ${nick} --carpeta ${nick.toUpperCase()}`);
+    }
+  }
+  function runWebAnalyzer() {
+    const url = prompt('URL del sitio a analizar:');
+    if (url) {
+      alert(`Corré en terminal:\n\npython3 agentes/web.py "${url}" --modo cliente`);
+    }
+  }
+  function runCarrusel() {
+    const tema = prompt('Tema del carrusel:');
+    if (tema) {
+      alert(`Decile a Claude:\n\nCarrusel ${tema}`);
+    }
+  }
+</script>
+
+</body>
+</html>

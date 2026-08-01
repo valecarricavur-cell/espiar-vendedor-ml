@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calculadora — Impulse Agency</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green: #1ae82f;
+      --cyan: #22cfff;
+      --bg: #0d0d0d;
+      --card: #161616;
+      --card2: #1e1e1e;
+      --border: #2a2a2a;
+      --text: #f0f0f0;
+      --muted: #777;
+      --red: #ff4d4d;
+      --yellow: #f5c542;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      min-height: 100vh;
+    }
+
+    /* HEADER */
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 20px 32px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .logo-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); }
+    header h1 { font-size: 15px; font-weight: 600; letter-spacing: 0.04em; color: var(--text); }
+    header span { font-size: 13px; color: var(--muted); margin-left: 4px; }
+
+    /* TABS */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      padding: 24px 32px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .tab-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 500;
+      padding: 10px 18px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+      letter-spacing: 0.02em;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active { color: var(--green); border-bottom-color: var(--green); }
+
+    /* CONTENT */
+    .tab-content { display: none; padding: 32px; max-width: 960px; margin: 0 auto; }
+    .tab-content.active { display: block; }
+
+    /* GRID */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    @media (max-width: 700px) { .grid-2 { grid-template-columns: 1fr; } .tabs { padding: 16px 16px 0; } .tab-content { padding: 20px 16px; } }
+
+    /* CARDS */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+    }
+    .card-title {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 20px;
+    }
+
+    /* FORM ELEMENTS */
+    .field { margin-bottom: 16px; }
+    .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; font-weight: 500; }
+    .field input, .field select {
+      width: 100%;
+      background: var(--card2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 14px;
+      padding: 10px 12px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .field input:focus, .field select:focus { border-color: var(--cyan); }
+    .field select option { background: #1e1e1e; }
+    .field .prefix-input { position: relative; }
+    .field .prefix-input span {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      font-size: 13px;
+      pointer-events: none;
+    }
+    .field .prefix-input input { padding-left: 26px; }
+
+    /* RESULTS */
+    .result-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .result-row:last-child { border-bottom: none; }
+    .result-row .label { color: var(--muted); }
+    .result-row .value { font-weight: 600; font-size: 14px; }
+    .result-row .value.green { color: var(--green); }
+    .result-row .value.cyan { color: var(--cyan); }
+    .result-row .value.red { color: var(--red); }
+    .result-row .value.yellow { color: var(--yellow); }
+
+    .result-big {
+      background: var(--card2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .result-big .rb-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+    .result-big .rb-value { font-size: 22px; font-weight: 700; }
+    .result-big .rb-value.green { color: var(--green); }
+    .result-big .rb-value.cyan { color: var(--cyan); }
+    .result-big .rb-value.red { color: var(--red); }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+    .badge.good { background: rgba(26, 232, 47, 0.12); color: var(--green); }
+    .badge.warn { background: rgba(245, 197, 66, 0.12); color: var(--yellow); }
+    .badge.bad  { background: rgba(255, 77, 77, 0.12); color: var(--red); }
+
+    .divider { height: 1px; background: var(--border); margin: 16px 0; }
+
+    .note {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 12px;
+      line-height: 1.5;
+    }
+
+    /* SECTION TITLE */
+    .section-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .section-sub {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 28px;
+    }
+
+    /* Radio toggle */
+    .toggle-group { display: flex; gap: 8px; margin-bottom: 16px; }
+    .toggle-btn {
+      flex: 1;
+      padding: 8px;
+      background: var(--card2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s;
+    }
+    .toggle-btn.active { background: rgba(26,232,47,0.1); border-color: var(--green); color: var(--green); }
+    .toggle-btn:hover:not(.active) { border-color: #444; color: var(--text); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo-dot"></div>
+  <h1>Impulse Agency <span>— Calculadora de Costos</span></h1>
+</header>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('ml')">Mercado Libre</button>
+  <button class="tab-btn" onclick="switchTab('meta')">Meta Ads</button>
+  <button class="tab-btn" onclick="switchTab('precio')">Precio Sugerido</button>
+</div>
+
+<!-- ===================== TAB 1: MERCADO LIBRE ===================== -->
+<div id="tab-ml" class="tab-content active">
+  <div class="section-title">Calculadora Mercado Libre</div>
+  <div class="section-sub">Calculá tu margen real después de comisiones, IVA e impuestos de plataforma.</div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Datos del producto</div>
+
+      <div class="field">
+        <label>Tipo de publicación</label>
+        <select id="ml-tipo" onchange="calcML()">
+          <option value="gratuita">Gratuita (0%)</option>
+          <option value="clasica" selected>Clásica (~11%)</option>
+          <option value="premium">Premium (~16%)</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Costo del producto (ARS)</label>
+        <div class="prefix-input"><span>$</span>
+          <input type="number" id="ml-costo" value="5000" min="0" oninput="calcML()" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Precio de venta (ARS)</label>
+        <div class="prefix-input"><span>$</span>
+          <input type="number" id="ml-precio" value="12000" min="0" oninput="calcML()" />
+        </div>
+      </div>
+
+      <div class="field" id="ml-envio-field">
+        <label>Costo de envío que absorbés (ARS) <span style="color:var(--muted);font-size:11px">— Premium: incluido</span></label>
+        <div class="prefix-input"><span>$</span>
+          <input type="number" id="ml-envio" value="0" min="0" oninput="calcML()" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Cuotas sin interés</label>
+        <select id="ml-cuotas" onchange="calcML()">
+          <option value="0">Sin cuotas / 1 cuota (−2.99%)</option>
+          <option value="3">3 cuotas sin interés (−5.5%)</option>
+          <option value="6">6 cuotas sin interés (−9.5%)</option>
+          <option value="12">12 cuotas sin interés (−15%)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Resultado</div>
+
+      <div class="result-big">
+        <div>
+          <div class="rb-label">Margen Neto</div>
+          <div id="ml-margen-badge" class="badge good" style="margin-top:4px">—</div>
+        </div>
+        <div class="rb-value green" id="ml-margen-pct">—</div>
+      </div>
+
+      <div class="result-big">
+        <div><div class="rb-label">Ganancia neta</div></div>
+        <div class="rb-value cyan" id="ml-ganancia">—</div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="result-row">
+        <span class="label">Precio de venta</span>
+        <span class="value" id="ml-r-precio">—</span>
+      </div>
+      <div class="result-row">
+        <span class="label">Comisión ML</span>
+        <span class="value red" id="ml-r-comision">—</span>
+      </div>
+      <div class="result-row">
+        <span class="label">IVA sobre comisión (21%)</span>
+        <span class="value red" id="ml-r-iva">—</span>
+      </div>
+      <div class="result-row">
+        <span class="label">Costo cuotas MP</span>
+        <span class="value red" id="ml-r-cuotas">—</span>
+      </div>
+      <div class="result-row">
+        <span class="label">Costo de envío</span>
+        <span class="value red" id="ml-r-envio">—</span>
+      </div>
+      <div class="result-row">
+        <span class="label">Costo del producto</span>
+        <span class="value red" id="ml-r-costo">—</span>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="result-row">
+        <span class="label">Precio mínimo (margen 0)</span>
+        <span class="value yellow" id="ml-minimo">—</span>
+      </div>
+
+      <p class="note">Tarifas aproximadas 2025. IVA responsable inscripto. Verificá las comisiones exactas por categoría en ML.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== TAB 2: META ADS ===================== -->
+<div id="tab-meta" class="tab-content">
+  <div class="section-title">Calculadora Meta Ads</div>
+  <div class="section-sub">Estimá tu ROAS, costo por lead y punto de equilibrio antes de invertir.</div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Configuración de campaña</div>
+
+      <div class="field">
+        <label>Presupuesto diario (ARS)</label>
+        <div class="prefix-input"><span>$</span>
+          <input type="number" id="meta-budget" value="8000" min="0" oninput="calcMeta()" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Días de campaña</label>
+        <input type="number" id="meta-dias" value="7" min="1" max="365" oninput="calcMeta()" />
+      </div>
+
+      <div class="field">
+        <label>CPM estimado (ARS) <span style="color:var(--muted);font-size:11px">— típico AR: $800–$2.000</span></label>
+        <div class="prefix-input"><span>$</span>
+          <input type="number" id="meta-cpm" value="1500" min="1" oninput="calcMeta()" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label>CTR estimado (%) <span style="color:var(--muted);font-size:11px">— benchmark: 1–2%</span></label>
+        <input type="number" id="meta-ctr" value="1.5" min="0.1" step="0.1" max="100" oninput="calcMeta()" />
+      </div>
+
+      <div class="field">
+        <label>Tasa de conversión a lead (%) <span style="color:var(--muted);font-size:11px">— típico: 3–8%</span></label>
+        <input type="number" id="meta-conv" value="5" min="0.1" step="0.1" max="100" oninput="calcMeta()" />
+      </div>
+
+      <div class="field">
+        <label>Tasa de cierre (%) <span style="color:var(--muted);font-size:11px">— de leads a clientes</span></label>
+        <input type="number" id="meta-cierre" value="20" min="0.1" step="0.1" max="100" oninput="calcMeta()" />
+      </div>
+
+      <div class="field">
+        <label>Ticket promedio (ARS)</label>
+        <div class="prefix-input"><span>$</span>
+          <input type="number" id="meta-ticket" value="150000" min="0" oninput="calcMeta()" />
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Proyección</div>
+
+      <div class="result-big">
+        <div><div class="rb-label">ROAS estimado</div></div>
+        <div class="rb-value green" id="meta-roas">—</div>
+      </div>
+
+      <div class="result-big">
+        <div><div class="rb-label">Facturación estimada</div></div>
+        <div class="rb-value cyan" id="meta-facturacion">—</div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="result-row">
+        <span class="label">Presupuesto total</span>
+        <span class="value" id="meta-r-total">—</span>
+      </div>
+      <div class="result-row">
+        <span class="label">Impresiones estimadas</span>
+        <span class="value" id="meta-r-impresiones">—</span>
+      </div>
+      <div class="result-row">
+        <span class="label">Clicks estimados</span>
+        <span class="value" id="meta-r-clicks">—</span>
+      </div>
+      <div class="result-row">
+        <span class="label">Leads estimados</span>
+        <span class="value cyan" id="meta-r-leads">—</span>
+      </div>
+      <div class="result-row">
+        <span class="label">Ventas/cierres estimados</span>
+        <span class="value green" id="meta-r-ventas">—</span>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="result-row">
+        <span class="label">Costo por lead (CPL)</span>
+        <span class="value yellow" id="meta-r-cpl">—</span>
+      </div>
+      <div class="result-row">
+        <span class="label">Costo por venta (CPA)</span>
+        <span class="value yellow" id="meta-r-cpa">—</span>
+      </div>
+      <div class="result-row">
+        <span class="label">ROAS de equilibrio</span>
+        <span class="value" id="meta-r-eq">1.0×</span>
+      </div>
+      <div class="result-row">
+        <span class="label">Estado campaña</span>
+        <span id="meta-r-estado" class="badge good">—</span>
+      </div>
+
+      <p class="note">Proyección basada en benchmarks de Meta Argentina 2025. Los resultados reales dependen del creativo, la audiencia y la optimización.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== TAB 3: PRECIO SUGERIDO ===================== -->
+<div id="tab-precio" class="tab-content">
+  <div class="section-title">Calculadora de Precio Sugerido</div>
+  <div class="section-sub">Ingresá tu costo y el margen que querés obtener. Te calculamos el precio final cubriendo todos los costos de plataforma.</div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Parámetros</div>
+
+      <div class="field">
+        <label>Plataforma</label>
+        <select id="ps-plataforma" onchange="calcPrecio()">
+          <option value="ml_clasica">Mercado Libre Clásica (11%)</option>
+          <option value="ml_premium">Mercado Libre Premium (16%)</option>
+          <option value="tienda">Tienda propia / Tiendanube (~3%)</option>
+          <option value="custom">Comisión personalizada</option>
+        </select>
+      </div>
+
+      <div class="field" id="ps-custom-field" style="display:none">
+        <label>Comisión personalizada (%)</label>
+        <input type="number" id="ps-custom-rate" value="10" min="0" max="100" step="0.1" oninput="calcPrecio()" />
+      </div>
+
+      <div class="field">
+        <label>Costo del producto (ARS)</label>
+        <div class="prefix-input"><span>$</span>
+          <input type="number" id="ps-costo" value="5000" min="0" oninput="calcPrecio()" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Costo operativo / packaging (ARS)</label>
+        <div class="prefix-input"><span>$</span>
+          <input type="number" id="ps-operativo" value="300" min="0" oninput="calcPrecio()" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Costo de envío que absorbés (ARS)</label>
+        <div class="prefix-input"><span>$</span>
+          <input type="number" id="ps-envio" value="0" min="0" oninput="calcPrecio()" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Cuotas sin interés</label>
+        <select id="ps-cuotas" onchange="calcPrecio()">
+          <option value="0">Sin cuotas / 1 cuota (−2.99%)</option>
+          <option value="3">3 cuotas sin interés (−5.5%)</option>
+          <option value="6">6 cuotas sin interés (−9.5%)</option>
+          <option value="12">12 cuotas sin interés (−15%)</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Margen neto deseado (%)</label>
+        <input type="number" id="ps-margen" value="30" min="1" max="99" step="1" oninput="calcPrecio()" />
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Precio sugerido</div>
+
+      <div class="result-big">
+        <div><div class="rb-label">Precio de venta sugerido</div></div>
+        <div class="rb-value green" id="ps-precio">—</div>
+      </div>
+
+      <div class="result-big">
+        <div><div class="rb-label">Ganancia neta</div></div>
+        <div class="rb-value cyan" id="ps-ganancia">—</div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="result-row">
+        <span class="label">Costo del producto</span>
+        <span class="value red" id="ps-r-costo">—</span>
+      </div>
+      <div class="result-row">
+        <span class="label">Costo operativo</span>
+        <span class="value red" id="ps-r-operativo">—</span>
+      </div>
+      <div class="result-row">
+        <span class="label">Comisión plataforma + IVA</span>
+        <span class="value red" id="ps-r-comision">—</span>
+      </div>
+      <div class="result-row">
+        <span class="label">Costo cuotas MP</span>
+        <span class="value red" id="ps-r-cuotas">—</span>
+      </div>
+      <div class="result-row">
+        <span class="label">Costo de envío</span>
+        <span class="value red" id="ps-r-envio">—</span>
+      </div>
+      <div class="result-row">
+        <span class="label">Ganancia neta</span>
+        <span class="value green" id="ps-r-ganancia">—</span>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="result-row">
+        <span class="label">Precio mínimo (margen 0)</span>
+        <span class="value yellow" id="ps-r-minimo">—</span>
+      </div>
+
+      <p class="note">El precio sugerido ya absorbe todos los costos de plataforma. Si aumentás el precio, el margen sube proporcionalmente.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ─── UTILS ───────────────────────────────────────────────────────────────
+  const fmt = (n) => n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });
+  const pct = (n) => n.toFixed(1) + '%';
+  const num = (id) => parseFloat(document.getElementById(id).value) || 0;
+  const el  = (id) => document.getElementById(id);
+
+  const CUOTA_RATES = { 0: 0.0299, 3: 0.055, 6: 0.095, 12: 0.15 };
+
+  const ML_RATES = { gratuita: 0, clasica: 0.11, premium: 0.16 };
+
+  // ─── TAB SWITCHING ────────────────────────────────────────────────────────
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    el('tab-' + tab).classList.add('active');
+    event.target.classList.add('active');
+  }
+
+  // ─── ML CALC ─────────────────────────────────────────────────────────────
+  function calcML() {
+    const tipo    = el('ml-tipo').value;
+    const costo   = num('ml-costo');
+    const precio  = num('ml-precio');
+    const envio   = tipo === 'premium' ? 0 : num('ml-envio');
+    const cuotas  = parseInt(el('ml-cuotas').value);
+
+    // Premium includes envio, disable field
+    el('ml-envio-field').style.opacity = tipo === 'premium' ? '0.3' : '1';
+    if (tipo === 'premium') el('ml-envio').value = 0;
+
+    const comRate   = ML_RATES[tipo];
+    const comision  = precio * comRate;
+    const iva       = comision * 0.21;
+    const cuotaCost = precio * CUOTA_RATES[cuotas];
+    const totalCosts = comision + iva + cuotaCost + envio + costo;
+    const ganancia  = precio - totalCosts;
+    const margenPct = precio > 0 ? (ganancia / precio) * 100 : 0;
+
+    // Minimum price (margin = 0)
+    const totalRateWithIVA = comRate * 1.21 + CUOTA_RATES[cuotas];
+    const minimo = (costo + envio) / (1 - totalRateWithIVA);
+
+    el('ml-r-precio').textContent    = fmt(precio);
+    el('ml-r-comision').textContent  = '-' + fmt(comision);
+    el('ml-r-iva').textContent       = '-' + fmt(iva);
+    el('ml-r-cuotas').textContent    = '-' + fmt(cuotaCost);
+    el('ml-r-envio').textContent     = '-' + fmt(envio);
+    el('ml-r-costo').textContent     = '-' + fmt(costo);
+    el('ml-minimo').textContent      = fmt(minimo);
+
+    el('ml-ganancia').textContent    = fmt(ganancia);
+    el('ml-ganancia').className      = 'rb-value ' + (ganancia >= 0 ? 'cyan' : 'red');
+    el('ml-margen-pct').textContent  = pct(margenPct);
+    el('ml-margen-pct').className    = 'rb-value ' + (margenPct >= 20 ? 'green' : margenPct >= 10 ? 'yellow' : 'red');
+
+    const badge = el('ml-margen-badge');
+    if (margenPct >= 25) { badge.textContent = 'Excelente'; badge.className = 'badge good'; }
+    else if (margenPct >= 15) { badge.textContent = 'Aceptable'; badge.className = 'badge warn'; }
+    else if (margenPct >= 0)  { badge.textContent = 'Bajo'; badge.className = 'badge warn'; }
+    else                      { badge.textContent = 'Negativo'; badge.className = 'badge bad'; }
+  }
+
+  // ─── META CALC ───────────────────────────────────────────────────────────
+  function calcMeta() {
+    const budgetDay = num('meta-budget');
+    const dias      = num('meta-dias');
+    const cpm       = num('meta-cpm');
+    const ctr       = num('meta-ctr') / 100;
+    const convRate  = num('meta-conv') / 100;
+    const cierre    = num('meta-cierre') / 100;
+    const ticket    = num('meta-ticket');
+
+    const total       = budgetDay * dias;
+    const impresiones = cpm > 0 ? (total / cpm) * 1000 : 0;
+    const clicks      = impresiones * ctr;
+    const leads       = clicks * convRate;
+    const ventas      = leads * cierre;
+    const facturacion = ventas * ticket;
+    const roas        = total > 0 ? facturacion / total : 0;
+    const cpl         = leads > 0 ? total / leads : 0;
+    const cpa         = ventas > 0 ? total / ventas : 0;
+
+    el('meta-r-total').textContent      = fmt(total);
+    el('meta-r-impresiones').textContent = Math.round(impresiones).toLocaleString('es-AR');
+    el('meta-r-clicks').textContent     = Math.round(clicks).toLocaleString('es-AR');
+    el('meta-r-leads').textContent      = Math.round(leads).toLocaleString('es-AR');
+    el('meta-r-ventas').textContent     = Math.round(ventas).toLocaleString('es-AR');
+    el('meta-r-cpl').textContent        = fmt(cpl);
+    el('meta-r-cpa').textContent        = fmt(cpa);
+    el('meta-r-eq').textContent         = '1.0×';
+
+    el('meta-facturacion').textContent  = fmt(facturacion);
+    el('meta-roas').textContent         = roas.toFixed(1) + '×';
+    el('meta-roas').className           = 'rb-value ' + (roas >= 3 ? 'green' : roas >= 1 ? 'yellow' : 'red');
+
+    const estado = el('meta-r-estado');
+    if (roas >= 3)       { estado.textContent = 'Rentable'; estado.className = 'badge good'; }
+    else if (roas >= 1)  { estado.textContent = 'En equilibrio'; estado.className = 'badge warn'; }
+    else                 { estado.textContent = 'Deficitario'; estado.className = 'badge bad'; }
+  }
+
+  // ─── PRECIO SUGERIDO CALC ────────────────────────────────────────────────
+  function calcPrecio() {
+    const plataforma = el('ps-plataforma').value;
+    el('ps-custom-field').style.display = plataforma === 'custom' ? 'block' : 'none';
+
+    let comRate;
+    if (plataforma === 'ml_clasica')  comRate = 0.11;
+    else if (plataforma === 'ml_premium') comRate = 0.16;
+    else if (plataforma === 'tienda') comRate = 0.03;
+    else comRate = num('ps-custom-rate') / 100;
+
+    const includeIVA = plataforma !== 'tienda'; // Solo ML aplica IVA sobre comisión
+    const ivaFactor  = includeIVA ? 1.21 : 1.0;
+
+    const costo     = num('ps-costo');
+    const operativo = num('ps-operativo');
+    const envio     = num('ps-envio');
+    const cuotas    = parseInt(el('ps-cuotas').value);
+    const margenDes = num('ps-margen') / 100;
+
+    // costos variables como % del precio de venta
+    const comTotal  = comRate * ivaFactor;
+    const cuotaRate = CUOTA_RATES[cuotas];
+    const totalVarRate = comTotal + cuotaRate;
+
+    // costos fijos
+    const costosFijos = costo + operativo + envio;
+
+    // precio = costosFijos + margenDes * precio + totalVarRate * precio
+    // precio * (1 - margenDes - totalVarRate) = costosFijos
+    const denominator = 1 - margenDes - totalVarRate;
+    if (denominator <= 0) {
+      el('ps-precio').textContent = 'No viable';
+      return;
+    }
+
+    const precio    = costosFijos / denominator;
+    const comision  = precio * comRate;
+    const ivaC      = includeIVA ? comision * 0.21 : 0;
+    const cuotaCost = precio * cuotaRate;
+    const ganancia  = precio - costo - operativo - envio - comision - ivaC - cuotaCost;
+
+    // minimo: margen = 0
+    const minDenom  = 1 - totalVarRate;
+    const minimo    = minDenom > 0 ? costosFijos / minDenom : 0;
+
+    el('ps-precio').textContent      = fmt(precio);
+    el('ps-ganancia').textContent    = fmt(ganancia);
+    el('ps-r-costo').textContent     = '-' + fmt(costo);
+    el('ps-r-operativo').textContent = '-' + fmt(operativo);
+    el('ps-r-comision').textContent  = '-' + fmt(comision + ivaC);
+    el('ps-r-cuotas').textContent    = '-' + fmt(cuotaCost);
+    el('ps-r-envio').textContent     = '-' + fmt(envio);
+    el('ps-r-ganancia').textContent  = fmt(ganancia);
+    el('ps-r-minimo').textContent    = fmt(minimo);
+  }
+
+  // ─── INIT ─────────────────────────────────────────────────────────────────
+  calcML();
+  calcMeta();
+  calcPrecio();
+</script>
+</body>
+</html>
