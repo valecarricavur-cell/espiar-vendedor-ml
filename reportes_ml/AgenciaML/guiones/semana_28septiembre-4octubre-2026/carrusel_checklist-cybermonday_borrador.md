@@ -1,65 +1,33 @@
-# Carrusel 2 — CyberMonday: el checklist para llegar listo
-**Publicar:** jueves 1/10 · **Objetivo:** urgencia + guardados + DMs · 8 slides
-> Nota: CyberMonday Argentina suele ser a principios de noviembre. Confirmar la fecha oficial antes de publicar y ajustar "5 semanas" si cambia.
+# Carrusel 2 — Checklist CyberMonday
+**Día:** miércoles 30/9 · **Acompaña:** reel `guion_mie_cybermonday-stock.md` · **Estilo:** light · **Keyword:** STOCK
+> Confirmar la fecha oficial de CyberMonday y ajustar "5 semanas" si cambia.
 
----
-
-## SLIDE 1 — Faltan 5 semanas para CyberMonday
-**Copy:** Los que venden más ese día no lo improvisan. Este es el checklist que usamos con nuestras cuentas.
-**Visual:** Fondo negro, cuenta regresiva grande en verde "5 SEMANAS". Estilo reloj digital.
-
----
-
-## SLIDE 2 — Semana 1: Stock
-**Copy:** Mirá qué vendiste en el último evento y en las últimas 8 semanas. Pedí stock ahora: los proveedores se atrasan en octubre. Quedarte sin stock el día del evento es plata que no vuelve.
-**Visual:** Checkbox + ícono de caja. Fondo blanco.
-
----
-
-## SLIDE 3 — Semana 1: Elegí tus productos estrella
-**Copy:** No pongas todo en oferta. Elegí 3 a 5 productos con buen margen y buena conversión. Esos son los que empujás con ads y descuento.
-**Visual:** Fondo celeste, 3 cajas de producto con estrella.
-
----
-
-## SLIDE 4 — Semana 2: Fichas a punto
-**Copy:** Títulos, fotos y ficha técnica completa en los productos estrella. Si una publicación no convierte hoy, con descuento tampoco va a explotar.
-**Visual:** Checklist de 3 ítems tildados.
-
----
-
-## SLIDE 5 — Semana 3: Números del descuento
-**Copy:** Calculá tu margen real con el descuento, la comisión y el envío. Si con el descuento perdés plata en cada venta, no es una oferta: es un problema.
-**Visual:** Mini calculadora: Precio - descuento - comisión - envío - costo = margen.
-
----
-
-## SLIDE 6 — Semana 4: Product Ads calentando
-**Copy:** Activá o ajustá campañas antes del evento para que junten datos. Definí presupuesto diario y un ACOS máximo que puedas bancar.
-**Visual:** Gráfico de línea subiendo hacia el día del evento.
-
----
-
-## SLIDE 7 — Semana 5: El día del evento
-**Copy:** Preguntas respondidas en minutos, stock monitoreado cada pocas horas y presupuesto de ads revisado a la mañana y a la tarde.
-**Visual:** Fondo negro, reloj + notificaciones, estilo "modo evento".
-
----
-
-## SLIDE 8 — ¿Querés llegar con la cuenta revisada?
-**Copy:** Estamos tomando auditorías pre-CyberMonday. Comentá "AUDITORÍA" o escribinos por WhatsApp y te decimos qué ajustar primero.
-**Visual:** Fondo verde, texto negro, logo Impulse Agency. Guardalo 📌
-
----
+```json
+{"slides": [
+  {"tipo": "portada", "titulo": "Faltan 5 semanas para CyberMonday.", "copy": "Tu stock ya va tarde."},
+  {"tipo": "contenido", "numero": 1, "titulo": "Semana 1: stock", "copy": "Mirá lo que vendiste en el último evento y pedí ahora. En octubre los proveedores se atrasan."},
+  {"tipo": "contenido", "numero": 2, "titulo": "Elegí 3 a 5 estrellas", "copy": "No pongas toda la tienda en oferta. Elegí los productos con buen margen que ya convierten."},
+  {"tipo": "contenido", "numero": 3, "titulo": "Semana 2: fichas", "copy": "Si una publicación no convierte hoy, con descuento tampoco va a explotar. Arreglala ahora."},
+  {"tipo": "lista", "titulo": "Semana 3: la cuenta del descuento", "items": ["Precio con descuento", "Menos comisión", "Menos envío", "Menos costo", "= Margen real"]},
+  {"tipo": "contenido", "numero": 5, "titulo": "Semana 4: ads", "copy": "Prendé Product Ads antes del evento para que junten datos. Con un ACOS máximo definido."},
+  {"tipo": "cierre", "titulo": "CyberMonday no se gana ese día.", "copy": "Se gana cinco semanas antes.", "cta": "Comentá STOCK ⤵️ y te mando la plantilla de stock."}
+]}
+```
 
 ## Caption
 
-Faltan 5 semanas para CyberMonday. ⏳
+Si vendés en Mercado Libre y todavía no empezaste a preparar CyberMonday, ya vas tarde.
 
-Los sellers que más venden ese día no lo improvisan: llegan con stock, fichas optimizadas, números del descuento hechos y campañas que ya juntaron datos.
+Esta semana es de stock. Mirá lo que vendiste en el último evento y pedí ahora, porque en octubre los proveedores se atrasan. Quedarte sin stock ese día es plata que no vuelve.
 
-Te dejo el checklist semana por semana que usamos con nuestras cuentas. Guardalo y tachá cada punto. ✅
+Elegí tres a cinco productos estrella con buen margen. No toda la tienda va en oferta.
 
-Si querés llegar con la cuenta revisada, estamos tomando auditorías pre-CyberMonday. Comentá "AUDITORÍA" y te escribo.
+La semana que viene, fichas. Después, la cuenta del descuento: si con la comisión y el envío te da negativo, no es una oferta, es un problema.
 
-**Hashtags:** #cybermonday #cybermondayargentina #mercadolibre #vendedoresmercadolibre #mercadolibreargentina #ecommerceargentina #productads #ventasonline #emprendedoresargentinos #impulseagency
+Y la cuarta semana, prendé los ads para que junten datos antes del evento.
+
+CyberMonday no se gana ese día. Se gana cinco semanas antes.
+
+Comentá STOCK ⤵️ y te mando la plantilla para proyectar tu stock del evento.
+
+#mercadolibre #ecommerce #ventasonline #escalapropia #cybermonday #vendedoresmercadolibre #sellersargentina #ecommerceargentina
