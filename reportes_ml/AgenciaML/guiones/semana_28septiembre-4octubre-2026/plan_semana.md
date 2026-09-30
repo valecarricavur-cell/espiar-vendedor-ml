@@ -46,4 +46,3 @@ Los carruseles tienen el JSON listo para `agentes/carrusel_imagenes.py --slides-
 ## Antes de publicar
 - Confirmar la fecha oficial de CyberMonday y ajustar "5 semanas" si cambia.
 - Confirmar con Futura Tech que se puede usar su nombre. Si no, "un seller de tecnología".
-- `agentes/carrusel_imagenes.py` todavía firma como Impulse Agency: cambiarlo antes de renderizar.
